@@ -17,6 +17,8 @@ from src.atm.utils.security import hash_pin, verify_pin
 
 ADMIN_SESSION_PREFIX = "admin_session:"
 ADMIN_SESSION_TTL = 1800  # 30 minutes
+MAINTENANCE_KEY = "atm:maintenance_mode"
+MAINTENANCE_REASON_KEY = "atm:maintenance_reason"
 
 
 class AdminAuthError(Exception):
@@ -196,6 +198,51 @@ async def get_audit_logs(
         }
         for log in logs
     ]
+
+
+async def enable_maintenance_mode(reason: str | None = None) -> dict[str, str]:
+    """Enable ATM maintenance mode.
+
+    Args:
+        reason: Optional human-readable reason for the maintenance.
+
+    Returns:
+        Confirmation message dict.
+    """
+    redis = await get_redis()
+    await redis.set(MAINTENANCE_KEY, "1")
+    if reason:
+        await redis.set(MAINTENANCE_REASON_KEY, reason)
+    else:
+        await redis.delete(MAINTENANCE_REASON_KEY)
+    return {"message": "Maintenance mode enabled"}
+
+
+async def disable_maintenance_mode() -> dict[str, str]:
+    """Disable ATM maintenance mode.
+
+    Returns:
+        Confirmation message dict.
+    """
+    redis = await get_redis()
+    await redis.delete(MAINTENANCE_KEY)
+    await redis.delete(MAINTENANCE_REASON_KEY)
+    return {"message": "Maintenance mode disabled"}
+
+
+async def get_maintenance_status() -> dict[str, Any]:
+    """Get the current maintenance mode status.
+
+    Returns:
+        Dict with ``enabled`` bool and optional ``reason``.
+    """
+    redis = await get_redis()
+    enabled = await redis.get(MAINTENANCE_KEY)
+    reason = await redis.get(MAINTENANCE_REASON_KEY)
+    return {
+        "enabled": enabled == "1",
+        "reason": reason or None,
+    }
 
 
 async def create_admin_user(

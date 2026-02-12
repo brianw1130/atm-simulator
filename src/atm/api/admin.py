@@ -14,9 +14,12 @@ from src.atm.services.admin_service import (
     AdminAuthError,
     admin_logout,
     authenticate_admin,
+    disable_maintenance_mode,
+    enable_maintenance_mode,
     freeze_account,
     get_all_accounts,
     get_audit_logs,
+    get_maintenance_status,
     unfreeze_account,
     validate_admin_session,
 )
@@ -181,6 +184,61 @@ async def list_audit_logs(
         List of audit log dicts.
     """
     return await get_audit_logs(db, limit=limit, event_type=event_type)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance mode endpoints
+# ---------------------------------------------------------------------------
+
+
+class MaintenanceRequest(BaseModel):
+    """Request body for enabling maintenance mode."""
+
+    reason: str | None = None
+
+
+@router.get("/api/maintenance/status")
+async def maintenance_status(admin: AdminSession) -> dict[str, Any]:
+    """Get current maintenance mode status.
+
+    Args:
+        admin: Validated admin session data.
+
+    Returns:
+        Dict with enabled flag and optional reason.
+    """
+    return await get_maintenance_status()
+
+
+@router.post("/api/maintenance/enable")
+async def maintenance_enable(
+    admin: AdminSession,
+    body: MaintenanceRequest | None = None,
+) -> dict[str, str]:
+    """Enable ATM maintenance mode.
+
+    Args:
+        admin: Validated admin session data.
+        body: Optional request body with reason.
+
+    Returns:
+        Confirmation message dict.
+    """
+    reason = body.reason if body else None
+    return await enable_maintenance_mode(reason)
+
+
+@router.post("/api/maintenance/disable")
+async def maintenance_disable(admin: AdminSession) -> dict[str, str]:
+    """Disable ATM maintenance mode.
+
+    Args:
+        admin: Validated admin session data.
+
+    Returns:
+        Confirmation message dict.
+    """
+    return await disable_maintenance_mode()
 
 
 # ---------------------------------------------------------------------------

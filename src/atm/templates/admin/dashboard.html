@@ -28,6 +28,14 @@
 </tr>
 {% endfor %}
 </table>
+<h2>Maintenance Mode</h2>
+<div id="maintenance-status">Loading...</div>
+<form method="post" action="/admin/api/maintenance/enable" style="display:inline">
+  <button type="submit">Enable Maintenance</button>
+</form>
+<form method="post" action="/admin/api/maintenance/disable" style="display:inline">
+  <button type="submit">Disable Maintenance</button>
+</form>
 <p><a href="/admin/audit-logs">View Audit Logs</a></p>
 <form method="post" action="/admin/api/logout"><button>Logout</button></form>
 </body>

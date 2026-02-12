@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from src.atm.config import settings
 from src.atm.logging import configure_logging
 from src.atm.middleware.correlation import CorrelationIdMiddleware
+from src.atm.middleware.maintenance import MaintenanceMiddleware
 from src.atm.middleware.rate_limit import limiter
 from src.atm.middleware.request_logging import RequestLoggingMiddleware
 from src.atm.services.redis_client import close_redis
@@ -46,7 +47,8 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Middleware order matters: outermost first.
-    # CorrelationId runs first (outermost), then RequestLogging.
+    # CorrelationId runs first (outermost), then RequestLogging, then Maintenance.
+    app.add_middleware(MaintenanceMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
 
