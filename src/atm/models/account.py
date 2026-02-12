@@ -69,7 +69,7 @@ class Account(Base):
 
     # Relationships
     customer: Mapped["Customer"] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        back_populates="accounts"
+        back_populates="accounts", lazy="selectin"
     )
     transactions: Mapped[list["Transaction"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         back_populates="account",

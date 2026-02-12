@@ -104,7 +104,7 @@ async def test_get_balance_after_withdrawal(
 async def test_get_balance_nonexistent_account(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """Balance inquiry for a nonexistent account returns 404."""
+    """Balance inquiry for an account not owned by the user returns 403."""
     customer = await create_test_customer(db_session)
     account = await create_test_account(
         db_session,
@@ -126,4 +126,5 @@ async def test_get_balance_nonexistent_account(
         headers={"X-Session-ID": session_id},
     )
 
-    assert resp.status_code == 404
+    # The IDOR protection returns 403 for accounts not owned by the customer
+    assert resp.status_code == 403

@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.atm.config import settings
 from src.atm.models.account import Account
@@ -22,6 +23,15 @@ from src.atm.models.transaction import Transaction
 from src.atm.pdf.statement_generator import generate_statement_pdf
 from src.atm.services.audit_service import log_event
 from src.atm.utils.formatting import mask_account_number
+
+
+def _utcnow() -> datetime:
+    """Return current UTC time as a naive datetime for DB compatibility.
+
+    Returns:
+        A naive datetime representing the current UTC time.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class StatementError(Exception):
@@ -70,8 +80,12 @@ async def generate_statement(
     Raises:
         StatementError: If the account is not found or dates are invalid.
     """
-    # Load account with customer info
-    stmt = select(Account).where(Account.id == account_id)
+    # Load account with customer info (eager-load customer to avoid async lazy load)
+    stmt = (
+        select(Account)
+        .options(selectinload(Account.customer))
+        .where(Account.id == account_id)
+    )
     result = await session.execute(stmt)
     account = result.scalars().first()
 
@@ -81,17 +95,15 @@ async def generate_statement(
     # Load customer via relationship
     customer = account.customer
 
-    # Determine date range
-    now = datetime.now(timezone.utc)
+    # Determine date range (naive UTC for SQLite compatibility)
+    now = _utcnow()
     if start_date is not None and end_date is not None:
         range_start = datetime(
             start_date.year, start_date.month, start_date.day,
-            tzinfo=timezone.utc,
         )
         range_end = datetime(
             end_date.year, end_date.month, end_date.day,
             hour=23, minute=59, second=59, microsecond=999999,
-            tzinfo=timezone.utc,
         )
     else:
         period_days = days if days is not None else 30

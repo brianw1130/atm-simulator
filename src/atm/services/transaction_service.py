@@ -26,6 +26,16 @@ from src.atm.services.audit_service import log_event
 from src.atm.utils.formatting import mask_account_number
 from src.atm.utils.security import generate_reference_number
 
+
+def _utcnow() -> datetime:
+    """Return current UTC time as a naive datetime for DB compatibility.
+
+    Returns:
+        A naive datetime representing the current UTC time.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 # Denomination constants (in cents)
 TWENTY_DOLLAR_BILL_CENTS = 2_000
 IMMEDIATE_AVAILABILITY_THRESHOLD_CENTS = 20_000  # $200
@@ -260,7 +270,7 @@ async def deposit(
         raise TransactionError("Check number is required for check deposits")
 
     account = await _load_account(session, account_id)
-    now = datetime.now(timezone.utc)
+    now = _utcnow()
 
     # Determine hold policy
     hold_until: datetime | None = None

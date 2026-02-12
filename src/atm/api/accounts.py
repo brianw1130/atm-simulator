@@ -61,7 +61,7 @@ async def list_accounts(
 @router.get(
     "/{account_id}/balance",
     response_model=BalanceInquiryResponse,
-    responses={404: {"model": ErrorResponse}},
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
 async def balance_inquiry(
     account_id: int,
@@ -78,6 +78,13 @@ async def balance_inquiry(
     Returns:
         Balance details and last 5 transactions.
     """
+    # Verify the requested account belongs to the authenticated customer
+    accounts = await get_customer_accounts(db, session_info["customer_id"])
+    if not any(acct.id == account_id for acct in accounts):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
     try:
         result = await get_account_balance(db, account_id)
     except AccountError as exc:

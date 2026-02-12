@@ -32,6 +32,18 @@ from src.atm.utils.security import (
 )
 
 
+def _utcnow() -> datetime:
+    """Return current UTC time as a naive datetime for DB compatibility.
+
+    SQLite strips timezone info from stored datetimes, so we use naive UTC
+    datetimes consistently to avoid TypeError when comparing aware vs naive.
+
+    Returns:
+        A naive datetime representing the current UTC time.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class AuthenticationError(Exception):
     """Raised when authentication fails."""
 
@@ -59,8 +71,8 @@ class SessionData:
     account_id: int
     customer_id: int
     card_id: int
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_activity: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=_utcnow)
+    last_activity: datetime = field(default_factory=_utcnow)
 
 
 # In-memory session store. In production this would be Redis or similar.
@@ -131,7 +143,8 @@ async def authenticate(
 
     # Check lockout
     if card.is_locked:
-        remaining = card.locked_until - datetime.now(timezone.utc)  # type: ignore[operator]
+        locked_until_naive = card.locked_until.replace(tzinfo=None)  # type: ignore[union-attr]
+        remaining = locked_until_naive - _utcnow()
         remaining_minutes = max(1, int(remaining.total_seconds() / 60))
         await log_event(
             session,
@@ -148,7 +161,7 @@ async def authenticate(
         card.failed_attempts += 1
 
         if card.failed_attempts >= settings.max_failed_pin_attempts:
-            card.locked_until = datetime.now(timezone.utc) + timedelta(
+            card.locked_until = _utcnow() + timedelta(
                 seconds=settings.lockout_duration_seconds
             )
             await session.flush()
@@ -226,8 +239,9 @@ async def validate_session(session_id: str) -> dict[str, int] | None:
     if session_data is None:
         return None
 
-    now = datetime.now(timezone.utc)
-    elapsed = (now - session_data.last_activity).total_seconds()
+    now = _utcnow()
+    last_activity = session_data.last_activity.replace(tzinfo=None)
+    elapsed = (now - last_activity).total_seconds()
     if elapsed > settings.session_timeout_seconds:
         # Session expired — remove it
         del sessions[session_id]

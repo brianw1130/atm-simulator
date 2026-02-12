@@ -45,8 +45,10 @@ def _add_customer_selectinload(orm_execute_state):  # type: ignore[no-untyped-de
             )
             break
 
-# Use SQLite for tests (no external database required)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///test.db"
+# Use a unique file-based SQLite for each test run to avoid stale state.
+# We use a temp file so parallel runs don't collide.
+_test_db_path = tempfile.mktemp(suffix=".db", prefix="atm_test_")
+TEST_DATABASE_URL = f"sqlite+aiosqlite:///{_test_db_path}"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 test_session_factory = async_sessionmaker(
@@ -66,6 +68,7 @@ def event_loop():
 async def setup_database():
     """Create all tables before each test and drop them after."""
     async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with test_engine.begin() as conn:

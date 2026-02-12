@@ -1,11 +1,16 @@
 """ATM Card model representing a physical ATM card linked to an account."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.atm.models import Base
+
+
+def _utcnow_naive() -> datetime:
+    """Return current UTC time as a naive datetime for DB compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class ATMCard(Base):
@@ -53,4 +58,6 @@ class ATMCard(Base):
         """Check if the card is currently locked due to failed PIN attempts."""
         if self.locked_until is None:
             return False
-        return datetime.now(tz=self.locked_until.tzinfo) < self.locked_until
+        # Compare as naive UTC to avoid issues with SQLite stripping tzinfo
+        locked = self.locked_until.replace(tzinfo=None)
+        return _utcnow_naive() < locked
