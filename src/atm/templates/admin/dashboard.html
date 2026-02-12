@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>ATM Admin - Dashboard</title></head>
+<body>
+<h1>ATM Admin Dashboard</h1>
+<h2>Accounts</h2>
+<table border="1">
+<tr><th>ID</th><th>Account</th><th>Customer</th><th>Type</th><th>Balance</th><th>Status</th><th>Actions</th></tr>
+{% for acct in accounts %}
+<tr>
+  <td>{{ acct.id }}</td>
+  <td>{{ acct.account_number }}</td>
+  <td>{{ acct.customer_name }}</td>
+  <td>{{ acct.account_type }}</td>
+  <td>{{ acct.balance }}</td>
+  <td>{{ acct.status }}</td>
+  <td>
+    {% if acct.status == "ACTIVE" %}
+    <form method="post" action="/admin/api/accounts/{{ acct.id }}/freeze" style="display:inline">
+      <button type="submit">Freeze</button>
+    </form>
+    {% else %}
+    <form method="post" action="/admin/api/accounts/{{ acct.id }}/unfreeze" style="display:inline">
+      <button type="submit">Unfreeze</button>
+    </form>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+<p><a href="/admin/audit-logs">View Audit Logs</a></p>
+<form method="post" action="/admin/api/logout"><button>Logout</button></form>
+</body>
+</html>

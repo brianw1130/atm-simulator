@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>ATM Admin - Audit Logs</title></head>
+<body>
+<h1>Audit Logs</h1>
+<p><a href="/admin/dashboard">Back to Dashboard</a></p>
+<table border="1">
+<tr><th>ID</th><th>Event Type</th><th>Account ID</th><th>Session ID</th><th>Details</th><th>Timestamp</th></tr>
+{% for log in logs %}
+<tr>
+  <td>{{ log.id }}</td>
+  <td>{{ log.event_type }}</td>
+  <td>{{ log.account_id or "-" }}</td>
+  <td>{{ log.session_id or "-" }}</td>
+  <td>{{ log.details or "-" }}</td>
+  <td>{{ log.created_at or "-" }}</td>
+</tr>
+{% endfor %}
+</table>
+</body>
+</html>
