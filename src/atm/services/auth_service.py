@@ -5,12 +5,13 @@ Coverage requirement: 100%
 
 Responsibilities:
     - PIN verification against bcrypt hashes
-    - Session creation and validation
+    - Session creation and validation (Redis-backed)
     - Failed attempt tracking and account lockout
     - Session timeout enforcement
     - PIN change with complexity validation
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,7 @@ from src.atm.models.account import Account
 from src.atm.models.audit import AuditEventType
 from src.atm.models.card import ATMCard
 from src.atm.services.audit_service import log_event
+from src.atm.services.redis_client import get_redis
 from src.atm.utils.formatting import mask_account_number
 from src.atm.utils.security import (
     generate_session_token,
@@ -30,6 +32,20 @@ from src.atm.utils.security import (
     validate_pin_complexity,
     verify_pin,
 )
+
+SESSION_KEY_PREFIX = "session:"
+
+
+def _session_key(token: str) -> str:
+    """Build the Redis key for a session token.
+
+    Args:
+        token: The session token.
+
+    Returns:
+        The Redis key string.
+    """
+    return f"{SESSION_KEY_PREFIX}{token}"
 
 
 def _utcnow() -> datetime:
@@ -58,7 +74,7 @@ class PinChangeError(Exception):
 
 @dataclass
 class SessionData:
-    """In-memory session data for an authenticated user.
+    """Session data for an authenticated user, stored in Redis as JSON.
 
     Attributes:
         account_id: The primary account ID associated with this session.
@@ -74,18 +90,37 @@ class SessionData:
     created_at: datetime = field(default_factory=_utcnow)
     last_activity: datetime = field(default_factory=_utcnow)
 
+    def to_dict(self) -> dict[str, int | str]:
+        """Serialize session data to a JSON-compatible dict.
 
-# In-memory session store. In production this would be Redis or similar.
-_sessions: dict[str, SessionData] = {}
+        Returns:
+            A dictionary with all session fields, datetimes as ISO strings.
+        """
+        return {
+            "account_id": self.account_id,
+            "customer_id": self.customer_id,
+            "card_id": self.card_id,
+            "created_at": self.created_at.isoformat(),
+            "last_activity": self.last_activity.isoformat(),
+        }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, int | str]) -> "SessionData":
+        """Deserialize session data from a dict.
 
-def _get_sessions() -> dict[str, SessionData]:
-    """Return the session store. Exists to allow test mocking.
+        Args:
+            data: A dictionary with session fields.
 
-    Returns:
-        The global in-memory session dictionary.
-    """
-    return _sessions
+        Returns:
+            A SessionData instance.
+        """
+        return cls(
+            account_id=int(data["account_id"]),
+            customer_id=int(data["customer_id"]),
+            card_id=int(data["card_id"]),
+            created_at=datetime.fromisoformat(str(data["created_at"])),
+            last_activity=datetime.fromisoformat(str(data["last_activity"])),
+        )
 
 
 async def authenticate(
@@ -194,11 +229,17 @@ async def authenticate(
     await session.flush()
 
     token = generate_session_token()
-    sessions = _get_sessions()
-    sessions[token] = SessionData(
+    session_data = SessionData(
         account_id=card.account_id,
         customer_id=card.account.customer_id,
         card_id=card.id,
+    )
+
+    redis = await get_redis()
+    await redis.set(
+        _session_key(token),
+        json.dumps(session_data.to_dict()),
+        ex=settings.session_timeout_seconds,
     )
 
     account = card.account
@@ -224,8 +265,8 @@ async def authenticate(
 async def validate_session(session_id: str) -> dict[str, int] | None:
     """Validate an active session and refresh its activity timestamp.
 
-    Checks that the session exists and has not exceeded the inactivity
-    timeout. Updates the last_activity timestamp on valid sessions.
+    Checks that the session exists in Redis. If present, refreshes the
+    TTL for sliding window expiry.
 
     Args:
         session_id: The session token to validate.
@@ -234,20 +275,21 @@ async def validate_session(session_id: str) -> dict[str, int] | None:
         A dict with account_id, customer_id, and card_id if the session
         is valid. None if the session is expired or not found.
     """
-    sessions = _get_sessions()
-    session_data = sessions.get(session_id)
-    if session_data is None:
+    redis = await get_redis()
+    data = await redis.get(_session_key(session_id))
+    if data is None:
         return None
 
-    now = _utcnow()
-    last_activity = session_data.last_activity.replace(tzinfo=None)
-    elapsed = (now - last_activity).total_seconds()
-    if elapsed > settings.session_timeout_seconds:
-        # Session expired — remove it
-        del sessions[session_id]
-        return None
+    session_data = SessionData.from_dict(json.loads(data))
 
-    session_data.last_activity = now
+    # Refresh TTL (sliding window)
+    session_data.last_activity = _utcnow()
+    await redis.set(
+        _session_key(session_id),
+        json.dumps(session_data.to_dict()),
+        ex=settings.session_timeout_seconds,
+    )
+
     return {
         "account_id": session_data.account_id,
         "customer_id": session_data.customer_id,
@@ -261,7 +303,7 @@ async def logout(
 ) -> bool:
     """End an authenticated session.
 
-    Removes the session from the in-memory store and logs the event.
+    Removes the session from Redis and logs the event.
 
     Args:
         session: Async SQLAlchemy session for audit logging.
@@ -270,10 +312,13 @@ async def logout(
     Returns:
         True if the session was found and removed, False if it didn't exist.
     """
-    sessions = _get_sessions()
-    session_data = sessions.pop(session_id, None)
-    if session_data is None:
+    redis = await get_redis()
+    data = await redis.get(_session_key(session_id))
+    if data is None:
         return False
+
+    session_data = SessionData.from_dict(json.loads(data))
+    await redis.delete(_session_key(session_id))
 
     await log_event(
         session,

@@ -9,10 +9,13 @@ Routes:
     POST /pin/change — Change the PIN (requires active session)
 """
 
-from fastapi import APIRouter, Header, HTTPException, status
 from typing import Annotated
 
+from fastapi import APIRouter, Header, HTTPException, status
+from starlette.requests import Request
+
 from src.atm.api import CurrentSession, DbSession
+from src.atm.middleware.rate_limit import get_card_number_or_ip, limiter
 from src.atm.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -35,12 +38,14 @@ router = APIRouter()
 @router.post(
     "/login",
     response_model=LoginResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-async def login(body: LoginRequest, db: DbSession) -> LoginResponse:
+@limiter.limit("5/15minutes", key_func=get_card_number_or_ip)
+async def login(request: Request, body: LoginRequest, db: DbSession) -> LoginResponse:
     """Authenticate with card number and PIN.
 
     Args:
+        request: The incoming HTTP request (required by slowapi rate limiter).
         body: Login request containing card_number and pin.
         db: Database session dependency.
 

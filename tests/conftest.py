@@ -11,6 +11,7 @@ import asyncio
 import tempfile
 from collections.abc import AsyncGenerator
 
+import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -23,7 +24,7 @@ from src.atm.models import Base
 from src.atm.models.account import Account
 from src.atm.main import app
 from src.atm.api import get_db
-from src.atm.services.auth_service import _sessions
+from src.atm.services.redis_client import set_redis
 
 # Point statement output to a temp directory for tests
 settings.statement_output_dir = tempfile.mkdtemp(prefix="atm_statements_")
@@ -67,14 +68,20 @@ def event_loop():
 @pytest_asyncio.fixture(autouse=True)
 async def setup_database():
     """Create all tables before each test and drop them after."""
+    # Create a fresh FakeRedis bound to the current event loop.
+    # FakeRedis uses internal asyncio.Queue which must be created in the
+    # same event loop that will be used for async operations.
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    set_redis(fake)
+
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    # Clear in-memory sessions between tests
-    _sessions.clear()
+    # Clear Redis sessions between tests
+    await fake.flushall()
 
 
 @pytest_asyncio.fixture

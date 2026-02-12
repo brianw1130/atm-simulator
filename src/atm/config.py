@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://atm_user:atm_pass@db:5432/atm_db"
     database_url_sync: str = "postgresql://atm_user:atm_pass@db:5432/atm_db"
 
+    # Redis
+    redis_url: str = "redis://redis:6379/0"
+
     # Security
     secret_key: str = "change-me-in-production"
     pin_pepper: str = "change-me-in-production"

@@ -11,6 +11,7 @@ Tests:
       complexity failure, expired session, card not found in DB
 """
 
+import json
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -25,12 +26,13 @@ from src.atm.services.auth_service import (
     PinChangeError,
     SessionData,
     SessionError,
-    _get_sessions,
+    _session_key,
     authenticate,
     change_pin,
     logout,
     validate_session,
 )
+from src.atm.services.redis_client import get_redis
 from src.atm.utils.security import hash_pin
 
 pytestmark = pytest.mark.asyncio
@@ -86,12 +88,12 @@ async def _seed_card(
 
 
 @pytest.fixture(autouse=True)
-def clear_sessions():
-    """Clear the in-memory session store before and after each test."""
-    sessions = _get_sessions()
-    sessions.clear()
+async def clear_sessions():
+    """Clear the Redis session store before and after each test."""
+    redis = await get_redis()
+    await redis.flushall()
     yield
-    sessions.clear()
+    await redis.flushall()
 
 
 # ── authenticate ─────────────────────────────────────────────────────────────
@@ -111,8 +113,9 @@ class TestAuthenticate:
         await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
 
-        sessions = _get_sessions()
-        assert result["session_id"] in sessions
+        redis = await get_redis()
+        data = await redis.get(_session_key(result["session_id"]))
+        assert data is not None
 
     async def test_failed_attempts_reset_on_success(self, db_session: AsyncSession):
         customer, account, card = await _seed_card(db_session, failed_attempts=2)
@@ -200,9 +203,9 @@ class TestValidateSession:
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
-        # Manually expire the session
-        sessions = _get_sessions()
-        sessions[session_id].last_activity = datetime.now(timezone.utc) - timedelta(minutes=5)
+        # Delete the key from Redis to simulate expiry
+        redis = await get_redis()
+        await redis.delete(_session_key(session_id))
 
         info = await validate_session(session_id)
         assert info is None
@@ -212,25 +215,29 @@ class TestValidateSession:
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
-        sessions = _get_sessions()
-        sessions[session_id].last_activity = datetime.now(timezone.utc) - timedelta(minutes=5)
+        # Delete the key from Redis to simulate expiry
+        redis = await get_redis()
+        await redis.delete(_session_key(session_id))
 
         await validate_session(session_id)
-        assert session_id not in sessions
+        data = await redis.get(_session_key(session_id))
+        assert data is None
 
     async def test_valid_session_refreshes_activity(self, db_session: AsyncSession):
         await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
-        sessions = _get_sessions()
-        old_activity = sessions[session_id].last_activity
+        redis = await get_redis()
+        old_data = json.loads(await redis.get(_session_key(session_id)))
+        old_activity = old_data["last_activity"]
 
         import time
         time.sleep(0.01)
 
         await validate_session(session_id)
-        assert sessions[session_id].last_activity >= old_activity
+        new_data = json.loads(await redis.get(_session_key(session_id)))
+        assert new_data["last_activity"] >= old_activity
 
 
 # ── logout ───────────────────────────────────────────────────────────────────
@@ -251,8 +258,9 @@ class TestLogout:
         session_id = result["session_id"]
 
         await logout(db_session, session_id)
-        sessions = _get_sessions()
-        assert session_id not in sessions
+        redis = await get_redis()
+        data = await redis.get(_session_key(session_id))
+        assert data is None
 
     async def test_logout_nonexistent_session_returns_false(self, db_session: AsyncSession):
         success = await logout(db_session, "nonexistent-session")
@@ -321,8 +329,9 @@ class TestChangePin:
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
-        sessions = _get_sessions()
-        sessions[session_id].last_activity = datetime.now(timezone.utc) - timedelta(minutes=5)
+        # Delete from Redis to simulate expired session
+        redis = await get_redis()
+        await redis.delete(_session_key(session_id))
 
         with pytest.raises(SessionError, match="expired"):
             await change_pin(db_session, session_id, TEST_PIN, "4829", "4829")
@@ -334,11 +343,17 @@ class TestChangePin:
             )
 
     async def test_card_not_found_raises_session_error(self, db_session: AsyncSession):
-        sessions = _get_sessions()
-        sessions["fake-session"] = SessionData(
+        # Manually store a session in Redis pointing to a nonexistent card
+        redis = await get_redis()
+        session_data = SessionData(
             account_id=999,
             customer_id=999,
             card_id=999,
+        )
+        await redis.set(
+            _session_key("fake-session"),
+            json.dumps(session_data.to_dict()),
+            ex=120,
         )
 
         with pytest.raises(SessionError, match="Card not found"):

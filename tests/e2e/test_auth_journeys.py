@@ -4,6 +4,8 @@ E2E-AUTH-01 through E2E-AUTH-06 as specified in CLAUDE.md.
 Each test is independent with fresh database state.
 """
 
+import json
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -11,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.models.audit import AuditEventType, AuditLog
 from src.atm.models.card import ATMCard
-from src.atm.services.auth_service import _sessions
+from src.atm.services.auth_service import _session_key
+from src.atm.services.redis_client import get_redis
 from tests.e2e.conftest import seed_e2e_data
 
 
@@ -50,9 +53,11 @@ async def test_e2e_auth_01_successful_login(
     audit_entries = list(audit_result.scalars().all())
     assert len(audit_entries) >= 1
 
-    # Verify session was created in memory
+    # Verify session was created in Redis
     session_id = resp_data["session_id"]
-    assert session_id in _sessions
+    redis = await get_redis()
+    session_data = await redis.get(_session_key(session_id))
+    assert session_data is not None
 
 
 @pytest.mark.asyncio
@@ -148,17 +153,15 @@ async def test_e2e_auth_05_session_timeout(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     """E2E-AUTH-05: Session Timeout."""
-    from datetime import datetime, timedelta, timezone
-
     data = await seed_e2e_data(db_session)
 
     result = await _login(client, data["alice_card_number"], "7856")
     assert result["status_code"] == 200
     session_id = result["data"]["session_id"]
 
-    # Simulate timeout by moving last_activity back beyond timeout
-    session_data = _sessions[session_id]
-    session_data.last_activity = datetime.now(timezone.utc) - timedelta(seconds=300)
+    # Simulate timeout by deleting the session key from Redis
+    redis = await get_redis()
+    await redis.delete(_session_key(session_id))
 
     # Attempt an operation -- should fail with 401
     resp = await client.get(
