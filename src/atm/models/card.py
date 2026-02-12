@@ -1,6 +1,6 @@
 """ATM Card model representing a physical ATM card linked to an account."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,7 +10,7 @@ from src.atm.models import Base
 
 def _utcnow_naive() -> datetime:
     """Return current UTC time as a naive datetime for DB compatibility."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class ATMCard(Base):
@@ -37,9 +37,7 @@ class ATMCard(Base):
     card_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

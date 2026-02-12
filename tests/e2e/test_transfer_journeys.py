@@ -137,9 +137,7 @@ async def test_e2e_trf_02_own_account_savings_to_checking(
 
 
 @pytest.mark.asyncio
-async def test_e2e_trf_03_external_transfer(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_trf_03_external_transfer(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-TRF-03: Transfer $200 from Alice to Bob."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["alice_card_number"], "7856")
@@ -280,9 +278,7 @@ async def test_e2e_trf_06_transfer_to_nonexistent_account(
     assert alice is not None
     assert alice.balance_cents == 525_000
 
-    audit_stmt = select(AuditLog).where(
-        AuditLog.event_type == AuditEventType.TRANSFER_DECLINED
-    )
+    audit_stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.TRANSFER_DECLINED)
     audit_entries = list((await db_session.execute(audit_stmt)).scalars().all())
     assert len(audit_entries) >= 1
 
@@ -307,8 +303,6 @@ async def test_e2e_trf_07_transfer_to_same_account(
     assert resp.status_code == 400
     assert "same account" in resp.json()["detail"].lower()
 
-    txn_stmt = select(Transaction).where(
-        Transaction.account_id == data["alice_checking"].id
-    )
+    txn_stmt = select(Transaction).where(Transaction.account_id == data["alice_checking"].id)
     txns = list((await db_session.execute(txn_stmt)).scalars().all())
     assert len(txns) == 0

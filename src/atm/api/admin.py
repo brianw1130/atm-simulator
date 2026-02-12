@@ -1,7 +1,7 @@
 """Admin panel API endpoints and template-rendered pages."""
 
 import pathlib
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -38,7 +38,7 @@ class AdminLoginRequest(BaseModel):
 
 async def get_admin_session(
     admin_session: str | None = Cookie(default=None),
-) -> dict:
+) -> dict[str, Any]:
     """Validate admin session from cookie.
 
     Args:
@@ -58,11 +58,11 @@ async def get_admin_session(
     return data
 
 
-AdminSession = Annotated[dict, Depends(get_admin_session)]
+AdminSession = Annotated[dict[str, Any], Depends(get_admin_session)]
 
 
 @router.post("/api/login")
-async def admin_login(body: AdminLoginRequest, db: DbSession, response: Response) -> dict:
+async def admin_login(body: AdminLoginRequest, db: DbSession, response: Response) -> dict[str, str]:
     """Authenticate an admin user.
 
     Args:
@@ -90,7 +90,7 @@ async def admin_login(body: AdminLoginRequest, db: DbSession, response: Response
 @router.post("/api/logout")
 async def admin_logout_endpoint(
     admin_session: str | None = Cookie(default=None),
-) -> dict:
+) -> dict[str, str]:
     """Log out the current admin session.
 
     Args:
@@ -105,7 +105,7 @@ async def admin_logout_endpoint(
 
 
 @router.get("/api/accounts")
-async def list_accounts(db: DbSession, admin: AdminSession) -> list[dict]:
+async def list_accounts(db: DbSession, admin: AdminSession) -> list[dict[str, Any]]:
     """List all accounts with customer info.
 
     Args:
@@ -120,8 +120,10 @@ async def list_accounts(db: DbSession, admin: AdminSession) -> list[dict]:
 
 @router.post("/api/accounts/{account_id}/freeze")
 async def freeze_account_endpoint(
-    account_id: int, db: DbSession, admin: AdminSession,
-) -> dict:
+    account_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
     """Freeze an account.
 
     Args:
@@ -140,8 +142,10 @@ async def freeze_account_endpoint(
 
 @router.post("/api/accounts/{account_id}/unfreeze")
 async def unfreeze_account_endpoint(
-    account_id: int, db: DbSession, admin: AdminSession,
-) -> dict:
+    account_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
     """Unfreeze an account.
 
     Args:
@@ -164,7 +168,7 @@ async def list_audit_logs(
     admin: AdminSession,
     limit: int = 100,
     event_type: str | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List recent audit log entries.
 
     Args:
@@ -250,6 +254,4 @@ async def admin_audit_logs_page(
     if session_data is None:
         return RedirectResponse(url="/admin/login", status_code=302)
     logs = await get_audit_logs(db, limit=limit, event_type=event_type)
-    return templates.TemplateResponse(
-        "admin/audit_logs.html", {"request": request, "logs": logs}
-    )
+    return templates.TemplateResponse("admin/audit_logs.html", {"request": request, "logs": logs})

@@ -80,7 +80,7 @@ class PinChangeRequest(BaseModel):
     def pins_must_match(cls, v: str, info: object) -> str:
         """Validate that new_pin and confirm_pin match."""
         # Access other field values through info.data
-        if hasattr(info, "data") and "new_pin" in info.data and v != info.data["new_pin"]:  # type: ignore[union-attr]
+        if hasattr(info, "data") and "new_pin" in info.data and v != info.data["new_pin"]:
             msg = "PINs do not match"
             raise ValueError(msg)
         return v

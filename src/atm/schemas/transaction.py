@@ -12,9 +12,7 @@ class WithdrawalRequest(BaseModel):
         amount_cents: Withdrawal amount in cents. Must be a positive multiple of 2000 ($20).
     """
 
-    amount_cents: int = Field(
-        ..., gt=0, description="Amount in cents (must be multiple of 2000)"
-    )
+    amount_cents: int = Field(..., gt=0, description="Amount in cents (must be multiple of 2000)")
 
     @field_validator("amount_cents")
     @classmethod
@@ -36,24 +34,16 @@ class DepositRequest(BaseModel):
     """
 
     amount_cents: int = Field(..., gt=0, description="Amount in cents")
-    deposit_type: str = Field(
-        ..., pattern="^(cash|check)$", description="'cash' or 'check'"
-    )
+    deposit_type: str = Field(..., pattern="^(cash|check)$", description="'cash' or 'check'")
     check_number: str | None = Field(
         None, max_length=20, description="Check number (required for check deposits)"
     )
 
     @field_validator("check_number")
     @classmethod
-    def check_number_required_for_checks(
-        cls, v: str | None, info: object
-    ) -> str | None:
+    def check_number_required_for_checks(cls, v: str | None, info: object) -> str | None:
         """Validate that check_number is provided for check deposits."""
-        if (
-            hasattr(info, "data")
-            and info.data.get("deposit_type") == "check"  # type: ignore[union-attr]
-            and not v
-        ):
+        if hasattr(info, "data") and info.data.get("deposit_type") == "check" and not v:
             msg = "Check number is required for check deposits"
             raise ValueError(msg)
         return v
@@ -138,13 +128,9 @@ class DepositResponse(TransactionResponse):
         hold_until: Datetime when held funds become available (None if no hold).
     """
 
-    available_immediately: str = Field(
-        ..., description="Formatted amount available immediately"
-    )
+    available_immediately: str = Field(..., description="Formatted amount available immediately")
     held_amount: str = Field(..., description="Formatted amount on hold")
-    hold_until: datetime | None = Field(
-        None, description="When held funds become available"
-    )
+    hold_until: datetime | None = Field(None, description="When held funds become available")
 
 
 class TransferResponse(TransactionResponse):
@@ -156,9 +142,7 @@ class TransferResponse(TransactionResponse):
     """
 
     source_account: str = Field(..., description="Masked source account number")
-    destination_account: str = Field(
-        ..., description="Masked destination account number"
-    )
+    destination_account: str = Field(..., description="Masked destination account number")
 
 
 class StatementRequest(BaseModel):
@@ -174,15 +158,9 @@ class StatementRequest(BaseModel):
         end_date: Custom range end date (inclusive).
     """
 
-    days: int = Field(
-        default=30, ge=1, le=365, description="Number of days for statement"
-    )
-    start_date: date | None = Field(
-        None, description="Custom range start date (inclusive)"
-    )
-    end_date: date | None = Field(
-        None, description="Custom range end date (inclusive)"
-    )
+    days: int = Field(default=30, ge=1, le=365, description="Number of days for statement")
+    start_date: date | None = Field(None, description="Custom range start date (inclusive)")
+    end_date: date | None = Field(None, description="Custom range end date (inclusive)")
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "StatementRequest":

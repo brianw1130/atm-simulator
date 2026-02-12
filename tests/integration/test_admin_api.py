@@ -8,7 +8,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.atm.models.account import AccountStatus
 from src.atm.models.audit import AuditEventType, AuditLog
 from src.atm.services.admin_service import create_admin_user
 from tests.factories import create_test_account, create_test_customer
@@ -42,9 +41,7 @@ async def _login(client: AsyncClient) -> dict:
 
 async def _seed_account(db_session: AsyncSession) -> int:
     """Create a customer with one checking account. Returns account ID."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -57,12 +54,8 @@ async def _seed_account(db_session: AsyncSession) -> int:
 
 async def _seed_audit_logs(db_session: AsyncSession) -> None:
     """Create sample audit log entries."""
-    db_session.add(
-        AuditLog(event_type=AuditEventType.LOGIN_SUCCESS, details={"card": "***0001"})
-    )
-    db_session.add(
-        AuditLog(event_type=AuditEventType.WITHDRAWAL, details={"amount": 10000})
-    )
+    db_session.add(AuditLog(event_type=AuditEventType.LOGIN_SUCCESS, details={"card": "***0001"}))
+    db_session.add(AuditLog(event_type=AuditEventType.WITHDRAWAL, details={"amount": 10000}))
     db_session.add(
         AuditLog(event_type=AuditEventType.LOGIN_FAILED, details={"reason": "wrong PIN"})
     )
@@ -117,9 +110,7 @@ class TestAdminLogin:
 
 
 class TestAdminLogout:
-    async def test_logout_with_cookie(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_logout_with_cookie(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Logout with a valid cookie returns 200."""
         await _create_admin(db_session)
         cookies = await _login(client)
@@ -179,9 +170,7 @@ class TestFreezeAccountEndpoint:
         account_id = await _seed_account(db_session)
         cookies = await _login(client)
 
-        resp = await client.post(
-            f"/admin/api/accounts/{account_id}/freeze", cookies=cookies
-        )
+        resp = await client.post(f"/admin/api/accounts/{account_id}/freeze", cookies=cookies)
         assert resp.status_code == 200
         assert "frozen" in resp.json()["message"].lower()
 
@@ -219,13 +208,9 @@ class TestUnfreezeAccountEndpoint:
         cookies = await _login(client)
 
         # Freeze first
-        await client.post(
-            f"/admin/api/accounts/{account_id}/freeze", cookies=cookies
-        )
+        await client.post(f"/admin/api/accounts/{account_id}/freeze", cookies=cookies)
         # Unfreeze
-        resp = await client.post(
-            f"/admin/api/accounts/{account_id}/unfreeze", cookies=cookies
-        )
+        resp = await client.post(f"/admin/api/accounts/{account_id}/unfreeze", cookies=cookies)
         assert resp.status_code == 200
         assert "unfrozen" in resp.json()["message"].lower()
 
@@ -300,9 +285,7 @@ class TestListAuditLogs:
 
 
 class TestAdminLoginPage:
-    async def test_returns_html(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_returns_html(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """GET /admin/login returns an HTML page."""
         resp = await client.get("/admin/login")
         assert resp.status_code == 200

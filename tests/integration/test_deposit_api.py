@@ -23,9 +23,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 async def _setup_bob(db_session: AsyncSession) -> None:
     """Seed Bob with checking account ($850.75) and card."""
-    customer = await create_test_customer(
-        db_session, first_name="Bob", last_name="Williams"
-    )
+    customer = await create_test_customer(db_session, first_name="Bob", last_name="Williams")
     await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -87,9 +85,7 @@ async def test_cash_deposit_large_amount_with_hold(
 
 
 @pytest.mark.asyncio
-async def test_check_deposit_with_hold(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_check_deposit_with_hold(client: AsyncClient, db_session: AsyncSession) -> None:
     """Check deposit applies hold policy and includes check_number."""
     await _setup_bob(db_session)
     session_id = await _login(client, "4000-0002-0001", "5678")

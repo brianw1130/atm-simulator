@@ -3,8 +3,6 @@
 Coverage requirement: 100%
 """
 
-import pytest
-
 from src.atm.models.customer import Customer
 
 

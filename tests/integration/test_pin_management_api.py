@@ -23,9 +23,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 async def _setup_alice(db_session: AsyncSession) -> None:
     """Seed Alice with checking account and card (PIN: 7856)."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -76,9 +74,7 @@ async def test_successful_pin_change(client: AsyncClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_pin_change_wrong_current_pin(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_pin_change_wrong_current_pin(client: AsyncClient, db_session: AsyncSession) -> None:
     """PIN change with incorrect current PIN returns 400."""
     await _setup_alice(db_session)
     session_id = await _login(client, "4000-0001-0001", "7856")
@@ -98,9 +94,7 @@ async def test_pin_change_wrong_current_pin(
 
 
 @pytest.mark.asyncio
-async def test_pin_change_complexity_failure(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_pin_change_complexity_failure(client: AsyncClient, db_session: AsyncSession) -> None:
     """PIN change to sequential digits (1234) fails Pydantic validation (422)."""
     await _setup_alice(db_session)
     session_id = await _login(client, "4000-0001-0001", "7856")

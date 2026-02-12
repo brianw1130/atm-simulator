@@ -25,7 +25,6 @@ from src.atm.ui.screens.withdrawal import WithdrawalScreen
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
-    from textual.screen import Screen
 
 API_BASE_URL = "http://localhost:8000/api/v1"
 SESSION_TIMEOUT_SECONDS = 120
@@ -140,11 +139,11 @@ class ATMApp(App[None]):
     }
     """
 
-    BINDINGS: ClassVar[list[Binding]] = [
+    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
         Binding("q", "quit", "Quit", show=True),
     ]
 
-    SCREENS: ClassVar[dict[str, type[Screen[object]]]] = {
+    SCREENS: ClassVar[dict[str, Any]] = {
         "welcome": WelcomeScreen,
         "pin_entry": PinEntryScreen,
         "main_menu": MainMenuScreen,

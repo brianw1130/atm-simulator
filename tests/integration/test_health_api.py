@@ -7,7 +7,7 @@ Tests cover:
     - Response structure includes expected fields
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient

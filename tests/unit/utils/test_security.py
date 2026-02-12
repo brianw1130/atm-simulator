@@ -157,17 +157,17 @@ class TestValidatePinComplexity:
 
     @pytest.mark.parametrize("pin", ["1234", "12345", "123456", "0123"])
     def test_sequential_ascending_rejected(self, pin):
-        is_valid, reason = validate_pin_complexity(pin)
+        is_valid, _reason = validate_pin_complexity(pin)
         assert is_valid is False
 
     @pytest.mark.parametrize("pin", ["4321", "54321", "654321"])
     def test_sequential_descending_rejected(self, pin):
-        is_valid, reason = validate_pin_complexity(pin)
+        is_valid, _reason = validate_pin_complexity(pin)
         assert is_valid is False
 
     @pytest.mark.parametrize("pin", ["0000", "9876", "1357", "2468"])
     def test_common_pins_rejected(self, pin):
-        is_valid, reason = validate_pin_complexity(pin)
+        is_valid, _reason = validate_pin_complexity(pin)
         assert is_valid is False
 
     def test_non_digit_characters_rejected(self):
@@ -186,7 +186,7 @@ class TestValidatePinComplexity:
         assert "4-6 digits" in reason
 
     def test_three_digits_rejected(self):
-        is_valid, reason = validate_pin_complexity("123")
+        is_valid, _reason = validate_pin_complexity("123")
         assert is_valid is False
 
     def test_too_long_rejected(self):
@@ -200,7 +200,7 @@ class TestValidatePinComplexity:
         assert "digits" in reason
 
     def test_special_characters_rejected(self):
-        is_valid, reason = validate_pin_complexity("12!4")
+        is_valid, _reason = validate_pin_complexity("12!4")
         assert is_valid is False
 
 

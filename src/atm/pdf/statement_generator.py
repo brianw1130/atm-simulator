@@ -11,7 +11,7 @@ Generates professional account statements with:
     - Summary totals (total debits, total credits)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -101,11 +101,15 @@ def generate_statement_pdf(
     elements.append(Spacer(1, 12))
 
     # Account information
-    elements.append(Paragraph(f"<b>Account Holder:</b> {account_info['customer_name']}", info_style))
-    elements.append(Paragraph(f"<b>Account Number:</b> {account_info['account_number']}", info_style))
+    elements.append(
+        Paragraph(f"<b>Account Holder:</b> {account_info['customer_name']}", info_style)
+    )
+    elements.append(
+        Paragraph(f"<b>Account Number:</b> {account_info['account_number']}", info_style)
+    )
     elements.append(Paragraph(f"<b>Account Type:</b> {account_info['account_type']}", info_style))
     elements.append(Paragraph(f"<b>Statement Period:</b> {period}", info_style))
-    generated_at = datetime.now(timezone.utc).strftime("%B %d, %Y %H:%M UTC")
+    generated_at = datetime.now(UTC).strftime("%B %d, %Y %H:%M UTC")
     elements.append(Paragraph(f"<b>Generated:</b> {generated_at}", info_style))
     elements.append(Spacer(1, 16))
 
@@ -139,12 +143,14 @@ def generate_statement_pdf(
             amount_str = f"+{_format_cents(amount_cents)}"
             total_credits_cents += amount_cents
 
-        table_data.append([
-            date_str,
-            str(txn["description"]),
-            amount_str,
-            _format_cents(balance_after_cents),
-        ])
+        table_data.append(
+            [
+                date_str,
+                str(txn["description"]),
+                amount_str,
+                _format_cents(balance_after_cents),
+            ]
+        )
 
     if len(table_data) == 1:
         # No transactions
@@ -152,18 +158,22 @@ def generate_statement_pdf(
 
     col_widths = [1.5 * inch, 3.0 * inch, 1.25 * inch, 1.25 * inch]
     table = Table(table_data, colWidths=col_widths)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 9),
-        ("FONTSIZE", (0, 1), (-1, -1), 8),
-        ("ALIGN", (2, 0), (3, -1), "RIGHT"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("ALIGN", (2, 0), (3, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
     elements.append(table)
     elements.append(Spacer(1, 16))
 
@@ -174,8 +184,12 @@ def generate_statement_pdf(
         fontSize=10,
         spaceAfter=4,
     )
-    elements.append(Paragraph(f"<b>Total Debits:</b> -{_format_cents(total_debits_cents)}", summary_style))
-    elements.append(Paragraph(f"<b>Total Credits:</b> +{_format_cents(total_credits_cents)}", summary_style))
+    elements.append(
+        Paragraph(f"<b>Total Debits:</b> -{_format_cents(total_debits_cents)}", summary_style)
+    )
+    elements.append(
+        Paragraph(f"<b>Total Credits:</b> +{_format_cents(total_credits_cents)}", summary_style)
+    )
     elements.append(Spacer(1, 8))
     elements.append(
         Paragraph(f"<b>Closing Balance:</b> {_format_cents(closing_balance_cents)}", summary_style)

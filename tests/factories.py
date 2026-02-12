@@ -6,15 +6,15 @@ Usage:
     card = await create_test_card(db_session, account_id=account.id, pin="1234")
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.atm.config import settings
 from src.atm.models.account import Account, AccountStatus, AccountType
 from src.atm.models.card import ATMCard
 from src.atm.models.customer import Customer
 from src.atm.models.transaction import Transaction, TransactionType
-from src.atm.config import settings
 from src.atm.utils.security import hash_pin
 
 TEST_PEPPER = settings.pin_pepper
@@ -201,13 +201,22 @@ async def seed_test_data(session: AsyncSession) -> dict:
     )
 
     alice_card = await create_test_card(
-        session, account_id=alice_checking.id, card_number="4000-0001-0001", pin="7856",
+        session,
+        account_id=alice_checking.id,
+        card_number="4000-0001-0001",
+        pin="7856",
     )
     bob_card = await create_test_card(
-        session, account_id=bob_checking.id, card_number="4000-0002-0001", pin="5678",
+        session,
+        account_id=bob_checking.id,
+        card_number="4000-0002-0001",
+        pin="5678",
     )
     charlie_card = await create_test_card(
-        session, account_id=charlie_checking.id, card_number="4000-0003-0001", pin="9012",
+        session,
+        account_id=charlie_checking.id,
+        card_number="4000-0003-0001",
+        pin="9012",
     )
 
     await session.commit()

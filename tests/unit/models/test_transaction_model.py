@@ -5,8 +5,6 @@ Coverage requirement: 100%
 Tests: amount_dollars, is_debit, is_credit
 """
 
-import pytest
-
 from src.atm.models.transaction import Transaction, TransactionType
 
 

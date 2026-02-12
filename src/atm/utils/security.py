@@ -129,7 +129,7 @@ def hash_pin(pin: str, pepper: str) -> str:
         raise ValueError("PIN must not be empty")
     if not pepper:
         raise ValueError("Pepper must not be empty")
-    peppered = f"{pepper}{pin}".encode("utf-8")
+    peppered = f"{pepper}{pin}".encode()
     salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(peppered, salt)
     return hashed.decode("utf-8")
@@ -148,7 +148,7 @@ def verify_pin(pin: str, pin_hash: str, pepper: str) -> bool:
     """
     if not pin or not pin_hash or not pepper:
         return False
-    peppered = f"{pepper}{pin}".encode("utf-8")
+    peppered = f"{pepper}{pin}".encode()
     try:
         return bcrypt.checkpw(peppered, pin_hash.encode("utf-8"))
     except (ValueError, TypeError):
@@ -183,11 +183,26 @@ def generate_reference_number() -> str:
 
 
 # PINs that are statistically common or trivially guessable.
-_COMMON_PINS: frozenset[str] = frozenset({
-    "0000", "1234", "4321", "1111", "2222", "3333",
-    "4444", "5555", "6666", "7777", "8888", "9999",
-    "0123", "9876", "1357", "2468",
-})
+_COMMON_PINS: frozenset[str] = frozenset(
+    {
+        "0000",
+        "1234",
+        "4321",
+        "1111",
+        "2222",
+        "3333",
+        "4444",
+        "5555",
+        "6666",
+        "7777",
+        "8888",
+        "9999",
+        "0123",
+        "9876",
+        "1357",
+        "2468",
+    }
+)
 
 
 def validate_pin_complexity(pin: str) -> tuple[bool, str]:

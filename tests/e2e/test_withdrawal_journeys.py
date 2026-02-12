@@ -26,9 +26,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_e2e_wdr_01_quick_withdraw_100(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_wdr_01_quick_withdraw_100(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-WDR-01: Quick Withdraw $100."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["alice_card_number"], "7856")
@@ -60,9 +58,7 @@ async def test_e2e_wdr_01_quick_withdraw_100(
     assert account.daily_withdrawal_used_cents == 10_000
 
     # Verify transaction record
-    txn_stmt = select(Transaction).where(
-        Transaction.account_id == data["alice_checking"].id
-    )
+    txn_stmt = select(Transaction).where(Transaction.account_id == data["alice_checking"].id)
     txn_result = await db_session.execute(txn_stmt)
     txns = list(txn_result.scalars().all())
     assert len(txns) == 1
@@ -115,18 +111,14 @@ async def test_e2e_wdr_03_non_standard_amount_rejected(
     assert account.balance_cents == 525_000
 
     # Verify no transaction created
-    txn_stmt = select(Transaction).where(
-        Transaction.account_id == data["alice_checking"].id
-    )
+    txn_stmt = select(Transaction).where(Transaction.account_id == data["alice_checking"].id)
     txn_result = await db_session.execute(txn_stmt)
     txns = list(txn_result.scalars().all())
     assert len(txns) == 0
 
 
 @pytest.mark.asyncio
-async def test_e2e_wdr_04_insufficient_funds(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_wdr_04_insufficient_funds(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-WDR-04: Insufficient Funds (Bob $850.75, withdraw $900)."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["bob_card_number"], "5678")
@@ -148,17 +140,13 @@ async def test_e2e_wdr_04_insufficient_funds(
     assert account.balance_cents == 85_075
 
     # Verify no transaction created
-    txn_stmt = select(Transaction).where(
-        Transaction.account_id == data["bob_checking"].id
-    )
+    txn_stmt = select(Transaction).where(Transaction.account_id == data["bob_checking"].id)
     txn_result = await db_session.execute(txn_stmt)
     txns = list(txn_result.scalars().all())
     assert len(txns) == 0
 
     # Verify audit log records declined transaction
-    audit_stmt = select(AuditLog).where(
-        AuditLog.event_type == AuditEventType.WITHDRAWAL_DECLINED
-    )
+    audit_stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.WITHDRAWAL_DECLINED)
     audit_result = await db_session.execute(audit_stmt)
     audit_entries = list(audit_result.scalars().all())
     assert len(audit_entries) >= 1

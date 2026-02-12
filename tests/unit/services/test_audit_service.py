@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.atm.models.audit import AuditEventType, AuditLog
 from src.atm.services.audit_service import log_event
 
-
 pytestmark = pytest.mark.asyncio
 
 

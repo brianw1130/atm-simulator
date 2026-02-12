@@ -34,9 +34,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 async def _setup_alice(db_session: AsyncSession) -> None:
     """Seed Alice with checking account ($5,250) and card."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,

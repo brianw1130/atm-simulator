@@ -93,9 +93,7 @@ async def test_logout_removes_session_from_redis(
 
 
 @pytest.mark.asyncio
-async def test_expired_session_returns_401(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_expired_session_returns_401(client: AsyncClient, db_session: AsyncSession) -> None:
     """An expired session (removed from Redis) returns 401 on protected endpoints."""
     customer = await create_test_customer(db_session)
     account = await create_test_account(
@@ -131,9 +129,7 @@ async def test_expired_session_returns_401(
 
 
 @pytest.mark.asyncio
-async def test_session_contains_card_id(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_session_contains_card_id(client: AsyncClient, db_session: AsyncSession) -> None:
     """Session data in Redis includes the card_id used for authentication."""
     customer = await create_test_customer(db_session)
     account = await create_test_account(

@@ -23,9 +23,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 async def _setup_alice(db_session: AsyncSession) -> None:
     """Seed Alice with checking account ($5,250) and card."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -81,9 +79,7 @@ async def test_withdrawal_non_twenty_multiple(
 
 
 @pytest.mark.asyncio
-async def test_withdrawal_insufficient_funds(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_withdrawal_insufficient_funds(client: AsyncClient, db_session: AsyncSession) -> None:
     """Withdraw more than balance returns 400."""
     customer = await create_test_customer(db_session, first_name="Bob", last_name="Williams")
     account = await create_test_account(

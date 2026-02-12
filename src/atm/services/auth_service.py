@@ -13,7 +13,7 @@ Responsibilities:
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,7 @@ def _utcnow() -> datetime:
     Returns:
         A naive datetime representing the current UTC time.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class AuthenticationError(Exception):
@@ -148,11 +148,7 @@ async def authenticate(
     """
     stmt = (
         select(ATMCard)
-        .options(
-            selectinload(ATMCard.account).selectinload(  # type: ignore[arg-type]
-                Account.customer
-            )
-        )
+        .options(selectinload(ATMCard.account).selectinload(Account.customer))
         .where(ATMCard.card_number == card_number)
     )
     result = await session.execute(stmt)
@@ -187,18 +183,14 @@ async def authenticate(
             account_id=card.account_id,
             details={"reason": "account_locked", "remaining_minutes": remaining_minutes},
         )
-        raise AuthenticationError(
-            f"Account is locked. Try again in {remaining_minutes} minute(s)."
-        )
+        raise AuthenticationError(f"Account is locked. Try again in {remaining_minutes} minute(s).")
 
     # Verify PIN
     if not verify_pin(pin, card.pin_hash, settings.pin_pepper):
         card.failed_attempts += 1
 
         if card.failed_attempts >= settings.max_failed_pin_attempts:
-            card.locked_until = _utcnow() + timedelta(
-                seconds=settings.lockout_duration_seconds
-            )
+            card.locked_until = _utcnow() + timedelta(seconds=settings.lockout_duration_seconds)
             await session.flush()
             await log_event(
                 session,

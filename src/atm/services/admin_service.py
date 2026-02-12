@@ -2,6 +2,7 @@
 
 import json
 import secrets
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,7 +61,7 @@ async def authenticate_admin(
     return token
 
 
-async def validate_admin_session(token: str) -> dict | None:
+async def validate_admin_session(token: str) -> dict[str, Any] | None:
     """Validate an admin session token.
 
     Args:
@@ -75,7 +76,8 @@ async def validate_admin_session(token: str) -> dict | None:
         return None
     # Refresh TTL on activity
     await redis.expire(f"{ADMIN_SESSION_PREFIX}{token}", ADMIN_SESSION_TTL)
-    return json.loads(data)
+    result: dict[str, Any] = json.loads(data)
+    return result
 
 
 async def admin_logout(token: str) -> bool:
@@ -88,11 +90,11 @@ async def admin_logout(token: str) -> bool:
         True if the session was found and deleted, False otherwise.
     """
     redis = await get_redis()
-    deleted = await redis.delete(f"{ADMIN_SESSION_PREFIX}{token}")
+    deleted: int = await redis.delete(f"{ADMIN_SESSION_PREFIX}{token}")
     return deleted > 0
 
 
-async def get_all_accounts(session: AsyncSession) -> list[dict]:
+async def get_all_accounts(session: AsyncSession) -> list[dict[str, Any]]:
     """Get all accounts with customer info.
 
     Args:
@@ -117,7 +119,7 @@ async def get_all_accounts(session: AsyncSession) -> list[dict]:
     ]
 
 
-async def freeze_account(session: AsyncSession, account_id: int) -> dict:
+async def freeze_account(session: AsyncSession, account_id: int) -> dict[str, str]:
     """Freeze an account.
 
     Args:
@@ -140,7 +142,7 @@ async def freeze_account(session: AsyncSession, account_id: int) -> dict:
     return {"message": f"Account {account.account_number} frozen"}
 
 
-async def unfreeze_account(session: AsyncSession, account_id: int) -> dict:
+async def unfreeze_account(session: AsyncSession, account_id: int) -> dict[str, str]:
     """Unfreeze an account.
 
     Args:
@@ -167,7 +169,7 @@ async def get_audit_logs(
     session: AsyncSession,
     limit: int = 100,
     event_type: str | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get recent audit log entries.
 
     Args:

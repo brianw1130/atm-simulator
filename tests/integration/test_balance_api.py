@@ -23,9 +23,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 @pytest.mark.asyncio
 async def test_get_balance(client: AsyncClient, db_session: AsyncSession) -> None:
     """Get balance returns 200 with account summary and recent transactions."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -57,13 +55,9 @@ async def test_get_balance(client: AsyncClient, db_session: AsyncSession) -> Non
 
 
 @pytest.mark.asyncio
-async def test_get_balance_after_withdrawal(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_get_balance_after_withdrawal(client: AsyncClient, db_session: AsyncSession) -> None:
     """Balance reflects the withdrawal performed in the same session."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,

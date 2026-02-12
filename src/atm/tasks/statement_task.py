@@ -2,13 +2,14 @@
 
 import asyncio
 from datetime import date
+from typing import Any
 
 from src.atm.worker import celery_app
 
 
-@celery_app.task(name="generate_statement_async", bind=True)  # type: ignore[misc]
+@celery_app.task(name="generate_statement_async", bind=True)  # type: ignore[untyped-decorator]
 def generate_statement_task(
-    self,  # type: ignore[no-untyped-def]
+    self: Any,
     account_id: int,
     days: int | None = None,
     start_date_str: str | None = None,

@@ -116,7 +116,6 @@ async def test_e2e_bal_03_balance_after_operations(
 
     assert len(bal_data["recent_transactions"]) >= 1
     withdrawal_found = any(
-        "Withdrawal" in txn["description"]
-        for txn in bal_data["recent_transactions"]
+        "Withdrawal" in txn["description"] for txn in bal_data["recent_transactions"]
     )
     assert withdrawal_found

@@ -9,14 +9,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.atm.models import Base
 
 
-class AccountType(str, enum.Enum):
+class AccountType(enum.StrEnum):
     """Types of bank accounts."""
 
     CHECKING = "CHECKING"
     SAVINGS = "SAVINGS"
 
 
-class AccountStatus(str, enum.Enum):
+class AccountStatus(enum.StrEnum):
     """Account status values."""
 
     ACTIVE = "ACTIVE"
@@ -46,13 +46,9 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id"), nullable=False, index=True
-    )
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
     account_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    account_type: Mapped[AccountType] = mapped_column(
-        Enum(AccountType), nullable=False
-    )
+    account_type: Mapped[AccountType] = mapped_column(Enum(AccountType), nullable=False)
     balance_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     available_balance_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     daily_withdrawal_used_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
