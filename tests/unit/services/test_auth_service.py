@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.atm.models.account import Account, AccountStatus, AccountType
 from src.atm.models.card import ATMCard
 from src.atm.models.customer import Customer
+from src.atm.config import settings
 from src.atm.services.auth_service import (
     AuthenticationError,
     PinChangeError,
@@ -37,9 +38,8 @@ from src.atm.utils.security import hash_pin
 
 pytestmark = pytest.mark.asyncio
 
-# Must match the pepper in config (settings.pin_pepper)
 TEST_PIN = "7856"
-TEST_PEPPER = "change-me-in-production"
+TEST_PEPPER = settings.pin_pepper
 
 
 async def _seed_card(
