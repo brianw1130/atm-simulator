@@ -23,6 +23,7 @@ from src.atm.models.account import Account, AccountStatus
 from src.atm.models.audit import AuditEventType
 from src.atm.models.transaction import Transaction, TransactionType
 from src.atm.services.audit_service import log_event
+from src.atm.services.cassette_service import can_dispense, dispense_bills
 from src.atm.utils.formatting import mask_account_number
 from src.atm.utils.security import generate_reference_number
 
@@ -186,6 +187,12 @@ async def withdraw(
             f"Daily withdrawal limit exceeded. Remaining: {_format_cents(max(0, remaining))}"
         )
 
+    # Check cassette availability
+    if not await can_dispense(session, amount_cents):
+        raise TransactionError(
+            "ATM cannot dispense this amount. Insufficient bills available."
+        )
+
     # Process withdrawal
     account.balance_cents -= amount_cents
     account.available_balance_cents -= amount_cents
@@ -203,8 +210,8 @@ async def withdraw(
     session.add(txn)
     await session.flush()
 
-    # Calculate denomination breakdown (all $20 bills)
-    num_twenties = amount_cents // TWENTY_DOLLAR_BILL_CENTS
+    # Get denomination breakdown from cassette
+    denominations = await dispense_bills(session, amount_cents)
 
     await log_event(
         session,
@@ -220,11 +227,7 @@ async def withdraw(
         "amount": _format_cents(amount_cents),
         "balance_after": _format_cents(account.balance_cents),
         "message": f"Withdrawal of {_format_cents(amount_cents)} successful",
-        "denominations": {
-            "twenties": num_twenties,
-            "total_bills": num_twenties,
-            "total_amount": _format_cents(amount_cents),
-        },
+        "denominations": denominations,
     }
 
 
