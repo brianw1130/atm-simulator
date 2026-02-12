@@ -3,8 +3,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.atm.models import Base
@@ -45,7 +44,9 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id"), nullable=False, index=True
+    )
     transaction_type: Mapped[TransactionType] = mapped_column(
         Enum(TransactionType), nullable=False
     )
@@ -60,7 +61,7 @@ class Transaction(Base):
     hold_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # type: ignore[assignment]
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
     # Relationships

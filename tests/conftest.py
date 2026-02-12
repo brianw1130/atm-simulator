@@ -8,16 +8,42 @@ Provides:
 """
 
 import asyncio
+import tempfile
 from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session, selectinload
 
+from src.atm.config import settings
 from src.atm.models import Base
+from src.atm.models.account import Account
 from src.atm.main import app
-from src.atm.db.session import get_async_session
+from src.atm.api import get_db
+from src.atm.services.auth_service import _sessions
+
+# Point statement output to a temp directory for tests
+settings.statement_output_dir = tempfile.mkdtemp(prefix="atm_statements_")
+
+# The Account.customer relationship defaults to lazy="select" (synchronous),
+# which triggers MissingGreenlet errors in async contexts (e.g. statement
+# service accessing account.customer). Registering a do_orm_execute event
+# on Session automatically adds selectinload(Account.customer) to SELECT
+# queries that target Account, so the relationship is eagerly loaded.
+@event.listens_for(Session, "do_orm_execute")
+def _add_customer_selectinload(orm_execute_state):  # type: ignore[no-untyped-def]
+    if not orm_execute_state.is_select:
+        return
+    # Only add selectinload when Account is among the root entities
+    for mapper_entity in orm_execute_state.all_mappers:
+        if mapper_entity.class_ is Account:
+            orm_execute_state.statement = orm_execute_state.statement.options(
+                selectinload(Account.customer)
+            )
+            break
 
 # Use SQLite for tests (no external database required)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///test.db"
@@ -44,6 +70,8 @@ async def setup_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Clear in-memory sessions between tests
+    _sessions.clear()
 
 
 @pytest_asyncio.fixture
@@ -55,12 +83,21 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Provide an async HTTP test client with test database."""
+    """Provide an async HTTP test client with test database.
 
-    async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
-        yield db_session
+    Overrides the get_db dependency so the FastAPI app uses the test
+    database session instead of the production one.
+    """
 
-    app.dependency_overrides[get_async_session] = override_get_session
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        try:
+            yield db_session
+        finally:
+            # Always commit so that side-effects (e.g. failed_attempts
+            # increments) persist across requests within the same test.
+            await db_session.commit()
+
+    app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

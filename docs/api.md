@@ -15,11 +15,519 @@ and `/redoc` (ReDoc) when running in development mode.
 All endpoints except `/api/v1/auth/login` and `/health` require an active session.
 Sessions are created via PIN authentication and expire after 2 minutes of inactivity.
 
+Authenticated requests must include the session token in the `X-Session-ID` header:
+
+```
+X-Session-ID: <session_token>
+```
+
+If the session is missing, invalid, or expired, the API returns `401 Unauthorized`.
+
+## Common Error Response
+
+All error responses use a consistent schema:
+
+```json
+{
+  "error": "insufficient_funds",
+  "detail": "Account balance of $850.75 is less than requested $900.00",
+  "error_code": "TXN_INSUFFICIENT_FUNDS"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `error` | string | Short error category (e.g., `insufficient_funds`, `account_locked`). |
+| `detail` | string | Human-readable description of the error. |
+| `error_code` | string | Machine-readable code for programmatic error handling. |
+
+## Common HTTP Status Codes
+
+| Code | Meaning |
+|---|---|
+| `200` | Success. |
+| `201` | Resource created (e.g., transaction recorded). |
+| `400` | Bad request — business rule violation (insufficient funds, daily limit exceeded). |
+| `401` | Unauthorized — missing, invalid, or expired session. |
+| `403` | Forbidden — account frozen or closed. |
+| `404` | Resource not found (e.g., destination account does not exist). |
+| `422` | Validation error — request body failed Pydantic schema validation. |
+| `429` | Rate limited — too many authentication attempts. |
+| `500` | Internal server error. |
+
+---
+
 ## Endpoints
 
-<!-- TODO: Document each endpoint group as implemented -->
+### Health Check
+
+#### `GET /health`
+
+Returns the application health status. No authentication required.
+
+**Response `200 OK`:**
+
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "database": "connected"
+}
+```
+
+---
 
 ### Authentication
+
+#### `POST /api/v1/auth/login`
+
+Authenticate with a card number and PIN. Returns a session token for subsequent requests.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `card_number` | string | Yes | ATM card number (1-20 characters). |
+| `pin` | string | Yes | 4-6 digit PIN. |
+
+```json
+{
+  "card_number": "1000-0001-0001",
+  "pin": "1234"
+}
+```
+
+**Response `200 OK`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `session_id` | string | Opaque session token for the `X-Session-ID` header. |
+| `account_number` | string | Masked account number (last 4 digits visible). |
+| `customer_name` | string | Customer's full name. |
+| `message` | string | Confirmation message. |
+
+```json
+{
+  "session_id": "abc123...xyz",
+  "account_number": "XXXX-XXXX-0001",
+  "customer_name": "Alice Johnson",
+  "message": "Authentication successful"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `401` | `AUTH_INVALID_CREDENTIALS` | Card number not found or PIN incorrect. Message is deliberately generic. |
+| `403` | `AUTH_ACCOUNT_LOCKED` | Card is locked due to consecutive failed attempts. Includes `locked_until` in details. |
+| `429` | `AUTH_RATE_LIMITED` | Too many authentication attempts for this card number (5 per 15-minute window). |
+
+---
+
+#### `POST /api/v1/auth/logout`
+
+Invalidate the current session. Requires authentication.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `401` | `AUTH_SESSION_INVALID` | Session not found or already expired. |
+
+---
+
+#### `POST /api/v1/auth/pin/change`
+
+Change the PIN for the authenticated card. Requires verification of the current PIN.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `current_pin` | string | Yes | Current 4-6 digit PIN for verification. |
+| `new_pin` | string | Yes | New 4-6 digit PIN. Must pass complexity rules. |
+| `confirm_pin` | string | Yes | Confirmation of new PIN. Must match `new_pin`. |
+
+```json
+{
+  "current_pin": "1234",
+  "new_pin": "7856",
+  "confirm_pin": "7856"
+}
+```
+
+**PIN Complexity Rules:**
+- Must contain only digits.
+- Cannot be all the same digit (e.g., `1111`).
+- Cannot be sequential digits ascending or descending (e.g., `1234`, `4321`).
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "PIN changed successfully"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `401` | `AUTH_INVALID_CREDENTIALS` | Current PIN is incorrect. |
+| `422` | `VALIDATION_ERROR` | New PIN fails complexity rules or PINs do not match. |
+
+---
+
 ### Accounts
+
+#### `GET /api/v1/accounts`
+
+List all accounts belonging to the authenticated customer.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Response `200 OK`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `accounts` | array | List of `AccountSummary` objects. |
+
+```json
+{
+  "accounts": [
+    {
+      "account_number": "XXXX-XXXX-0001",
+      "account_type": "CHECKING",
+      "balance": "$5,250.00",
+      "available_balance": "$5,250.00",
+      "status": "ACTIVE"
+    },
+    {
+      "account_number": "XXXX-XXXX-0002",
+      "account_type": "SAVINGS",
+      "balance": "$12,500.00",
+      "available_balance": "$12,500.00",
+      "status": "ACTIVE"
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /api/v1/accounts/{account_id}/balance`
+
+Get detailed balance information and a mini-statement (last 5 transactions) for a
+specific account.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `account_id` | integer | The account ID. |
+
+**Response `200 OK`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `account` | object | `AccountSummary` with balance details. |
+| `recent_transactions` | array | Last 5 transactions as `MiniStatementEntry` objects. |
+
+```json
+{
+  "account": {
+    "account_number": "XXXX-XXXX-0001",
+    "account_type": "CHECKING",
+    "balance": "$5,250.00",
+    "available_balance": "$5,250.00",
+    "status": "ACTIVE"
+  },
+  "recent_transactions": [
+    {
+      "date": "2026-02-10T14:30:00Z",
+      "description": "Cash Withdrawal",
+      "amount": "-$100.00",
+      "balance_after": "$5,250.00"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `403` | `ACCOUNT_FROZEN` | Account is frozen; balance inquiry may still be permitted depending on policy. |
+| `404` | `ACCOUNT_NOT_FOUND` | Account does not exist or does not belong to the authenticated customer. |
+
+---
+
 ### Transactions
+
+#### `POST /api/v1/transactions/withdraw`
+
+Withdraw cash from the authenticated account.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount_cents` | integer | Yes | Amount in cents. Must be positive and a multiple of 2000 ($20). |
+
+```json
+{
+  "amount_cents": 10000
+}
+```
+
+**Response `201 Created`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `reference_number` | string | Unique transaction reference. |
+| `transaction_type` | string | `"WITHDRAWAL"`. |
+| `amount` | string | Formatted dollar amount (e.g., `"$100.00"`). |
+| `balance_after` | string | Formatted balance after withdrawal. |
+| `message` | string | Confirmation message. |
+| `denominations` | object | `DenominationBreakdown` with bill counts. |
+
+```json
+{
+  "reference_number": "TXN-20260210-A1B2C3",
+  "transaction_type": "WITHDRAWAL",
+  "amount": "$100.00",
+  "balance_after": "$5,150.00",
+  "message": "Withdrawal of $100.00 completed successfully",
+  "denominations": {
+    "twenties": 5,
+    "total_bills": 5,
+    "total_amount": "$100.00"
+  }
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `400` | `TXN_INSUFFICIENT_FUNDS` | Account balance is less than the requested amount. |
+| `400` | `TXN_DAILY_LIMIT_EXCEEDED` | Withdrawal would exceed the $500 daily withdrawal limit. |
+| `403` | `ACCOUNT_FROZEN` | Account is frozen. |
+| `422` | `VALIDATION_ERROR` | Amount is not a positive multiple of $20. |
+
+---
+
+#### `POST /api/v1/transactions/deposit`
+
+Deposit cash or a check into the authenticated account.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount_cents` | integer | Yes | Amount in cents. Must be positive. |
+| `deposit_type` | string | Yes | `"cash"` or `"check"`. |
+| `check_number` | string | No | Required for check deposits. Max 20 characters. |
+
+```json
+{
+  "amount_cents": 50000,
+  "deposit_type": "cash"
+}
+```
+
+**Hold Policy:**
+- **Cash deposits:** First $200 available immediately. Remainder held for 1 business day.
+- **Check deposits:** First $200 available next business day. Remainder available after
+  2 business days.
+- **Deposits under $200:** Full amount available immediately (cash) or next business day
+  (check).
+
+**Response `201 Created`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `reference_number` | string | Unique transaction reference. |
+| `transaction_type` | string | `"DEPOSIT_CASH"` or `"DEPOSIT_CHECK"`. |
+| `amount` | string | Formatted deposit amount. |
+| `balance_after` | string | Formatted total balance after deposit. |
+| `message` | string | Confirmation message. |
+| `available_immediately` | string | Formatted amount available now. |
+| `held_amount` | string | Formatted amount on hold. |
+| `hold_until` | string or null | ISO 8601 datetime when held funds become available. |
+
+```json
+{
+  "reference_number": "TXN-20260210-D4E5F6",
+  "transaction_type": "DEPOSIT_CASH",
+  "amount": "$500.00",
+  "balance_after": "$1,350.75",
+  "message": "Cash deposit of $500.00 accepted",
+  "available_immediately": "$200.00",
+  "held_amount": "$300.00",
+  "hold_until": "2026-02-11T00:00:00Z"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `403` | `ACCOUNT_FROZEN` | Account is frozen. |
+| `403` | `ACCOUNT_CLOSED` | Account is closed. |
+| `422` | `VALIDATION_ERROR` | Amount is not positive, or check deposit missing check number. |
+
+---
+
+#### `POST /api/v1/transactions/transfer`
+
+Transfer funds between accounts. Supports own-account transfers (checking to savings)
+and external transfers (to another customer's account by account number).
+
+**Headers:** `X-Session-ID: <token>`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `destination_account_number` | string | Yes | Target account number (1-20 characters). |
+| `amount_cents` | integer | Yes | Amount in cents. Must be positive. |
+
+```json
+{
+  "destination_account_number": "1000-0001-0002",
+  "amount_cents": 100000
+}
+```
+
+**Response `201 Created`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `reference_number` | string | Unique transaction reference. |
+| `transaction_type` | string | `"TRANSFER_OUT"`. |
+| `amount` | string | Formatted transfer amount. |
+| `balance_after` | string | Formatted source account balance after transfer. |
+| `message` | string | Confirmation message. |
+| `source_account` | string | Masked source account number. |
+| `destination_account` | string | Masked destination account number. |
+
+```json
+{
+  "reference_number": "TXN-20260210-G7H8I9",
+  "transaction_type": "TRANSFER_OUT",
+  "amount": "$1,000.00",
+  "balance_after": "$4,250.00",
+  "message": "Transfer of $1,000.00 completed successfully",
+  "source_account": "XXXX-XXXX-0001",
+  "destination_account": "XXXX-XXXX-0002"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `400` | `TXN_INSUFFICIENT_FUNDS` | Source account balance is less than the transfer amount. |
+| `400` | `TXN_DAILY_LIMIT_EXCEEDED` | Transfer would exceed the $2,500 daily transfer limit. |
+| `400` | `TXN_SAME_ACCOUNT` | Source and destination are the same account. |
+| `403` | `ACCOUNT_FROZEN` | Source account is frozen. |
+| `404` | `ACCOUNT_NOT_FOUND` | Destination account does not exist. |
+| `422` | `VALIDATION_ERROR` | Amount is not positive. |
+
+---
+
 ### Statements
+
+#### `POST /api/v1/statements/generate`
+
+Generate a PDF account statement for a specified date range.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Request Body (mode 1 — relative period):**
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `days` | integer | No | 30 | Number of days to include (1-365). |
+
+```json
+{
+  "days": 7
+}
+```
+
+**Request Body (mode 2 — custom date range):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `start_date` | string (date) | Yes | Start date inclusive (ISO 8601, e.g., `"2026-01-01"`). |
+| `end_date` | string (date) | Yes | End date inclusive. Must not be in the future. |
+
+```json
+{
+  "start_date": "2026-01-01",
+  "end_date": "2026-01-31"
+}
+```
+
+**Validation Rules:**
+- If `start_date` is provided, `end_date` must also be provided (and vice versa).
+- `end_date` must not be before `start_date`.
+- `end_date` must not be in the future.
+- If both `days` and `start_date`/`end_date` are provided, the custom date range takes
+  precedence.
+
+**Response `200 OK`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `file_path` | string | Path to the generated PDF file. |
+| `period` | string | Human-readable period (e.g., `"Jan 1, 2026 - Jan 31, 2026"`). |
+| `transaction_count` | integer | Number of transactions in the statement. |
+| `opening_balance` | string | Formatted balance at start of period. |
+| `closing_balance` | string | Formatted balance at end of period. |
+
+```json
+{
+  "file_path": "/app/statements/stmt-1000-0001-0001-20260101-20260131.pdf",
+  "period": "Jan 1, 2026 - Jan 31, 2026",
+  "transaction_count": 15,
+  "opening_balance": "$5,350.00",
+  "closing_balance": "$5,250.00"
+}
+```
+
+**Statement PDF Contents:**
+- Account holder name.
+- Masked account number.
+- Statement period.
+- Opening and closing balances.
+- All transactions within the period with: date, description, amount, and running balance.
+- Summary totals: total deposits, total withdrawals, total transfers.
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `400` | `STMT_INVALID_DATE_RANGE` | `end_date` is before `start_date` or in the future. |
+| `422` | `VALIDATION_ERROR` | Only one of `start_date`/`end_date` provided, or `days` out of range. |

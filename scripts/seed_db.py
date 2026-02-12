@@ -9,12 +9,35 @@ Creates the test accounts defined in CLAUDE.md:
     - Charlie Davis: Checking ($0) + Savings ($100), PIN 9012
 """
 
-# TODO: Implement database seeding
-# This script should:
-# 1. Import async engine and session from src.atm.db.session
-# 2. Create customers, accounts, and cards using the models
-# 3. Hash PINs using src.atm.utils.security.hash_pin()
-# 4. Be idempotent (safe to run multiple times)
+import asyncio
+import sys
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from src.atm.config import settings
+from src.atm.db.seed import seed_database
+from src.atm.models import Base
+
+
+async def main() -> None:
+    """Create tables and seed the database."""
+    engine = create_async_engine(settings.database_url, echo=True)
+
+    # Create all tables if they don't exist
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as session:
+        async with session.begin():
+            await seed_database(session)
+
+    await engine.dispose()
+    print("Database seeded successfully.")
+
 
 if __name__ == "__main__":
-    print("TODO: Implement database seeding")
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        sys.exit(1)

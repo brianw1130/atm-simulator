@@ -46,7 +46,9 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.id"), nullable=False, index=True
+    )
     account_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     account_type: Mapped[AccountType] = mapped_column(
         Enum(AccountType), nullable=False
@@ -70,7 +72,10 @@ class Account(Base):
         back_populates="accounts"
     )
     transactions: Mapped[list["Transaction"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
-        back_populates="account", lazy="selectin", order_by="Transaction.created_at.desc()"
+        back_populates="account",
+        lazy="selectin",
+        order_by="Transaction.created_at.desc()",
+        foreign_keys="[Transaction.account_id]",
     )
     cards: Mapped[list["ATMCard"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         back_populates="account", lazy="selectin"

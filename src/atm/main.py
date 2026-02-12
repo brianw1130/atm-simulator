@@ -45,16 +45,17 @@ def _register_routers(app: FastAPI) -> None:
     Args:
         app: The FastAPI application instance.
     """
-    # TODO: Import and include routers as they are implemented
-    # from src.atm.api.auth import router as auth_router
-    # from src.atm.api.accounts import router as accounts_router
-    # from src.atm.api.transactions import router as transactions_router
-    # from src.atm.api.statements import router as statements_router
-    #
-    # app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
-    # app.include_router(accounts_router, prefix="/api/v1/accounts", tags=["Accounts"])
-    # app.include_router(transactions_router, prefix="/api/v1/transactions", tags=["Transactions"])
-    # app.include_router(statements_router, prefix="/api/v1/statements", tags=["Statements"])
+    from src.atm.api.auth import router as auth_router
+    from src.atm.api.accounts import router as accounts_router
+    from src.atm.api.transactions import router as transactions_router
+    from src.atm.api.statements import router as statements_router
+
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
+    app.include_router(accounts_router, prefix="/api/v1/accounts", tags=["Accounts"])
+    app.include_router(
+        transactions_router, prefix="/api/v1/transactions", tags=["Transactions"]
+    )
+    app.include_router(statements_router, prefix="/api/v1/statements", tags=["Statements"])
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

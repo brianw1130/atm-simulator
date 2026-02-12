@@ -53,3 +53,13 @@ class BalanceInquiryResponse(BaseModel):
 
     account: AccountSummary
     recent_transactions: list[MiniStatementEntry]
+
+
+class AccountListResponse(BaseModel):
+    """Response schema containing a list of account summaries.
+
+    Attributes:
+        accounts: List of account summary objects.
+    """
+
+    accounts: list[AccountSummary]
