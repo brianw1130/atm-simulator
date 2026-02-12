@@ -132,3 +132,23 @@ variable "log_level" {
   type        = string
   default     = "INFO"
 }
+
+# Observability
+variable "container_insights" {
+  description = "Enable Container Insights for the ECS cluster"
+  type        = bool
+  default     = false
+}
+
+# S3
+variable "s3_statements_bucket_arn" {
+  description = "ARN of the S3 bucket for PDF statement storage"
+  type        = string
+}
+
+# Deployment
+variable "deployment_minimum_healthy_percent" {
+  description = "Minimum healthy percent during deployment (0 allows downtime, 100 for zero-downtime)"
+  type        = number
+  default     = 0
+}

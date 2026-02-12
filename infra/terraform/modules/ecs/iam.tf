@@ -54,3 +54,24 @@ resource "aws_iam_role" "task" {
     Project     = var.project_name
   }
 }
+
+# Allow app containers to read/write PDF statements in S3
+data "aws_iam_policy_document" "s3_statements_access" {
+  statement {
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      var.s3_statements_bucket_arn,
+      "${var.s3_statements_bucket_arn}/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "s3_statements_access" {
+  name   = "${var.project_name}-${var.environment}-s3-statements"
+  role   = aws_iam_role.task.id
+  policy = data.aws_iam_policy_document.s3_statements_access.json
+}

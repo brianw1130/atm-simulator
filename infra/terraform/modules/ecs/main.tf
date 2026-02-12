@@ -5,7 +5,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = var.container_insights ? "enabled" : "disabled"
   }
 
   tags = {
@@ -117,10 +117,10 @@ resource "aws_ecs_task_definition" "worker" {
 
   container_definitions = jsonencode([
     {
-      name      = "worker"
-      image     = local.app_image
-      essential = true
-      command   = ["celery", "-A", "src.atm.worker", "worker", "--loglevel=info"]
+      name        = "worker"
+      image       = local.app_image
+      essential   = true
+      command     = ["celery", "-A", "src.atm.worker", "worker", "--loglevel=info"]
       environment = local.common_env
       secrets     = local.common_secrets
       logConfiguration = {
@@ -199,7 +199,7 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = true
   }
 
-  deployment_minimum_healthy_percent = 0
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
   deployment_maximum_percent         = 200
 
   tags = {

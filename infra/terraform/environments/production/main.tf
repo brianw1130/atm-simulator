@@ -61,16 +61,15 @@ module "rds" {
   security_group_id = module.security.rds_sg_id
   db_password       = var.db_password
 
-  # Dev-specific settings
-  deletion_protection = false
-  skip_final_snapshot = true
-  publicly_accessible = true
+  # Production-hardened settings
+  deletion_protection = true
+  skip_final_snapshot = false
+  publicly_accessible = true # Required for public-subnet Fargate (no NAT)
 }
 
 # ── Secrets Manager ──────────────────────────────────────────────────
 
 locals {
-  # Construct database URLs from RDS outputs
   database_url      = "postgresql+asyncpg://atm_user:${var.db_password}@${module.rds.endpoint}/atm_db"
   database_url_sync = "postgresql://atm_user:${var.db_password}@${module.rds.endpoint}/atm_db"
 }
@@ -85,8 +84,8 @@ module "secrets" {
   secret_key        = var.secret_key
   pin_pepper        = var.pin_pepper
 
-  # Dev: immediate deletion (no recovery window)
-  recovery_window_in_days = 0
+  # Production: 30-day recovery window before permanent deletion
+  recovery_window_in_days = 30
 }
 
 # ── Monitoring (CloudWatch) ──────────────────────────────────────────
@@ -96,7 +95,7 @@ module "monitoring" {
 
   project_name       = var.project_name
   environment        = var.environment
-  log_retention_days = 14 # Shorter retention for dev
+  log_retention_days = 90 # Longer retention for production
 }
 
 # ── S3 (Statement Storage) ──────────────────────────────────────────
@@ -139,14 +138,17 @@ module "ecs" {
   # S3
   s3_statements_bucket_arn = module.s3.bucket_arn
 
-  # Sizing (minimal for dev)
+  # Observability
+  container_insights = true
+
+  # Sizing (production)
   app_cpu              = 256 # 0.25 vCPU
   app_memory           = 512 # 512 MB
   app_desired_count    = 1
-  worker_desired_count = 0 # Disabled to save costs; scale to 1 when needed
+  worker_desired_count = 0 # Scale to 1 when async statements needed
 
-  # Allow downtime during dev deployments
-  deployment_minimum_healthy_percent = 0
+  # Zero-downtime deployments
+  deployment_minimum_healthy_percent = 100
 }
 
 # ── Outputs ──────────────────────────────────────────────────────────

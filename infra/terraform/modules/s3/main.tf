@@ -33,6 +33,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "statements" {
     id     = "expire-old-statements"
     status = "Enabled"
 
+    filter {} # Apply to all objects
+
     expiration {
       days = 90
     }
