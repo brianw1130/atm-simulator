@@ -1,0 +1,150 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - production
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: atm-simulator-${{ inputs.environment || 'dev' }}
+  ECS_CLUSTER: atm-simulator-${{ inputs.environment || 'dev' }}
+  ECS_SERVICE: atm-simulator-${{ inputs.environment || 'dev' }}-app
+
+jobs:
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/ci.yml
+
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          TAG="${{ github.sha }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "full_image=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: production
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.full_image }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  migrate:
+    name: Run Database Migrations
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run migration task
+        id: run-migration
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --task-definition "atm-simulator-${{ inputs.environment || 'dev' }}-migration" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=${{ vars.SUBNET_IDS }},securityGroups=[${{ vars.SECURITY_GROUP_ID }}],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          echo "task_arn=${TASK_ARN}" >> "$GITHUB_OUTPUT"
+          echo "Migration task started: ${TASK_ARN}"
+
+      - name: Wait for migration to complete
+        run: |
+          echo "Waiting for migration task to complete..."
+          aws ecs wait tasks-stopped \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks "${{ steps.run-migration.outputs.task_arn }}"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --tasks "${{ steps.run-migration.outputs.task_arn }}" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          echo "Migration exit code: ${EXIT_CODE}"
+          if [ "${EXIT_CODE}" != "0" ]; then
+            echo "::error::Migration failed with exit code ${EXIT_CODE}"
+            aws ecs describe-tasks \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --tasks "${{ steps.run-migration.outputs.task_arn }}" \
+              --query 'tasks[0].containers[0].reason' \
+              --output text
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy to ECS
+    needs: [build-and-push, migrate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new deployment
+        run: |
+          aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.ECS_SERVICE }}" \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
+
+      - name: Wait for service stability
+        run: |
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ env.ECS_SERVICE }}"
+          echo "Service is stable!"
+
+      - name: Deployment summary
+        run: |
+          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Environment:** ${{ inputs.environment || 'dev' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image Tag:** ${{ needs.build-and-push.outputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Cluster:** ${{ env.ECS_CLUSTER }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Service:** ${{ env.ECS_SERVICE }}" >> "$GITHUB_STEP_SUMMARY"

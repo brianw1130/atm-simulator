@@ -1,0 +1,17 @@
+# Copy this file to terraform.tfvars and fill in values:
+#   cp terraform.tfvars.example terraform.tfvars
+
+aws_region         = "us-east-1"
+project_name       = "atm-simulator"
+environment        = "dev"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# Database — choose a strong password
+db_password = "CHANGE_ME_strong_password_here"
+
+# Application secrets — generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+secret_key = "CHANGE_ME_generate_random_key"
+pin_pepper = "CHANGE_ME_generate_random_pepper"
+
+# Docker image tag (use 'latest' or a specific git SHA)
+image_tag = "latest"
