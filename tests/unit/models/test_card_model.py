@@ -5,9 +5,7 @@ Coverage requirement: 100%
 Tests: is_locked property under various locked_until values.
 """
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from src.atm.models.card import ATMCard
 
@@ -30,21 +28,21 @@ class TestIsLocked:
         assert card.is_locked is False
 
     def test_locked_when_locked_until_is_in_future(self):
-        future = datetime.now(tz=timezone.utc) + timedelta(minutes=30)
+        future = datetime.now(tz=UTC) + timedelta(minutes=30)
         card = _make_card(locked_until=future)
         assert card.is_locked is True
 
     def test_not_locked_when_locked_until_is_in_past(self):
-        past = datetime.now(tz=timezone.utc) - timedelta(minutes=30)
+        past = datetime.now(tz=UTC) - timedelta(minutes=30)
         card = _make_card(locked_until=past)
         assert card.is_locked is False
 
     def test_locked_just_one_second_in_future(self):
-        future = datetime.now(tz=timezone.utc) + timedelta(seconds=1)
+        future = datetime.now(tz=UTC) + timedelta(seconds=1)
         card = _make_card(locked_until=future)
         assert card.is_locked is True
 
     def test_not_locked_just_one_second_in_past(self):
-        past = datetime.now(tz=timezone.utc) - timedelta(seconds=1)
+        past = datetime.now(tz=UTC) - timedelta(seconds=1)
         card = _make_card(locked_until=past)
         assert card.is_locked is False

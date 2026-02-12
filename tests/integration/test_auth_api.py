@@ -16,7 +16,9 @@ async def test_login_valid_credentials(client: AsyncClient, db_session: AsyncSes
     """Login with valid card number and PIN returns 200 with session info."""
     customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(db_session, customer_id=customer.id)
-    await create_test_card(db_session, account_id=account.id, card_number="4000-0001-0001", pin="7856")
+    await create_test_card(
+        db_session, account_id=account.id, card_number="4000-0001-0001", pin="7856"
+    )
     await db_session.commit()
 
     response = await client.post(
@@ -39,7 +41,9 @@ async def test_login_invalid_pin(client: AsyncClient, db_session: AsyncSession) 
     account = await create_test_account(
         db_session, customer_id=customer.id, account_number="1000-0002-0001"
     )
-    await create_test_card(db_session, account_id=account.id, card_number="4000-0002-0001", pin="5678")
+    await create_test_card(
+        db_session, account_id=account.id, card_number="4000-0002-0001", pin="5678"
+    )
     await db_session.commit()
 
     response = await client.post(
@@ -72,7 +76,9 @@ async def test_login_lockout_after_three_failures(
     account = await create_test_account(
         db_session, customer_id=customer.id, account_number="1000-0099-0001"
     )
-    await create_test_card(db_session, account_id=account.id, card_number="4000-0099-0001", pin="7856")
+    await create_test_card(
+        db_session, account_id=account.id, card_number="4000-0099-0001", pin="7856"
+    )
     await db_session.commit()
 
     # First two failures return 401
@@ -145,7 +151,9 @@ async def test_logout_valid_session(client: AsyncClient, db_session: AsyncSessio
     account = await create_test_account(
         db_session, customer_id=customer.id, account_number="1000-0077-0001"
     )
-    await create_test_card(db_session, account_id=account.id, card_number="4000-0077-0001", pin="7856")
+    await create_test_card(
+        db_session, account_id=account.id, card_number="4000-0077-0001", pin="7856"
+    )
     await db_session.commit()
 
     # Login first

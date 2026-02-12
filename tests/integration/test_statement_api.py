@@ -7,11 +7,8 @@ from datetime import date, timedelta
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from src.atm.models.account import Account
 from tests.factories import create_test_account, create_test_card, create_test_customer
 
 
@@ -32,9 +29,7 @@ async def _setup_alice(db_session: AsyncSession) -> None:
     identity map so that the statement service can access account.customer
     without triggering a synchronous lazy load (which fails in async).
     """
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     account = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -75,9 +70,7 @@ async def test_generate_7_day_statement(
 
 
 @pytest.mark.asyncio
-async def test_generate_30_day_statement(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_generate_30_day_statement(client: AsyncClient, db_session: AsyncSession) -> None:
     """Generate a 30-day statement returns 200."""
     await _setup_alice(db_session)
     session_id = await _login(client, "4000-0001-0001", "7856")

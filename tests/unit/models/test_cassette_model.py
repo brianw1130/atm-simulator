@@ -5,8 +5,9 @@ Coverage requirement: 100%
 Tests: model creation with all fields, default values.
 """
 
+from datetime import UTC
+
 import pytest
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.models.cassette import CashCassette
@@ -17,9 +18,9 @@ pytestmark = pytest.mark.asyncio
 class TestCashCassetteModel:
     async def test_create_with_all_fields(self, db_session: AsyncSession) -> None:
         """CashCassette can be created with explicit values for all fields."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         cassette = CashCassette(
             denomination_cents=2000,
             bill_count=500,
@@ -44,9 +45,7 @@ class TestCashCassetteModel:
 
         assert cassette.bill_count == 0
 
-    async def test_default_max_capacity_is_2000(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_default_max_capacity_is_2000(self, db_session: AsyncSession) -> None:
         """max_capacity defaults to 2000 when not specified."""
         cassette = CashCassette(denomination_cents=2000)
         db_session.add(cassette)

@@ -15,6 +15,7 @@ Creates all core tables:
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -78,7 +79,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("0"),
         ),
-        sa.Column("status", account_status_enum, nullable=False, server_default=sa.text("'ACTIVE'")),
+        sa.Column(
+            "status", account_status_enum, nullable=False, server_default=sa.text("'ACTIVE'")
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

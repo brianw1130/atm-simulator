@@ -19,15 +19,16 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, selectinload
 
+from src.atm.api import get_db
 from src.atm.config import settings
+from src.atm.main import app
 from src.atm.models import Base
 from src.atm.models.account import Account
-from src.atm.main import app
-from src.atm.api import get_db
 from src.atm.services.redis_client import set_redis
 
 # Point statement output to a temp directory for tests
 settings.statement_output_dir = tempfile.mkdtemp(prefix="atm_statements_")
+
 
 # The Account.customer relationship defaults to lazy="select" (synchronous),
 # which triggers MissingGreenlet errors in async contexts (e.g. statement
@@ -46,15 +47,14 @@ def _add_customer_selectinload(orm_execute_state):  # type: ignore[no-untyped-de
             )
             break
 
+
 # Use a unique file-based SQLite for each test run to avoid stale state.
 # We use a temp file so parallel runs don't collide.
 _test_db_path = tempfile.mktemp(suffix=".db", prefix="atm_test_")
 TEST_DATABASE_URL = f"sqlite+aiosqlite:///{_test_db_path}"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-test_session_factory = async_sessionmaker(
-    test_engine, class_=AsyncSession, expire_on_commit=False
-)
+test_session_factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.fixture(scope="session")
@@ -109,9 +109,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

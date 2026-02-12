@@ -1,6 +1,8 @@
 """ASGI middleware for structured request/response logging."""
 
 import time
+from collections.abc import MutableMapping
+from typing import Any
 
 import structlog
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -38,7 +40,7 @@ class RequestLoggingMiddleware:
         start = time.monotonic()
         status_code = 0
 
-        async def send_with_logging(message: dict) -> None:  # type: ignore[type-arg]
+        async def send_with_logging(message: MutableMapping[str, Any]) -> None:
             nonlocal status_code
             if message["type"] == "http.response.start":
                 status_code = message.get("status", 0)

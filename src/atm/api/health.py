@@ -5,8 +5,10 @@ GET /ready — Readiness probe (checks DB + Redis connectivity)
 """
 
 import asyncio
+from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from src.atm.db.session import async_session_factory
@@ -26,8 +28,8 @@ async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@router.get("/ready")
-async def ready() -> dict:
+@router.get("/ready", response_model=None)
+async def ready() -> dict[str, Any] | JSONResponse:
     """Readiness probe. Checks database and Redis connectivity.
 
     Returns:
@@ -52,6 +54,7 @@ async def ready() -> dict:
     # Check Redis
     try:
         from src.atm.services.redis_client import get_redis
+
         redis = await get_redis()
         pong = await asyncio.wait_for(redis.ping(), timeout=CHECK_TIMEOUT)
         if pong:
@@ -67,7 +70,6 @@ async def ready() -> dict:
     response = {"status": status_str, "checks": checks}
 
     if not all_ok:
-        from fastapi.responses import JSONResponse
         return JSONResponse(content=response, status_code=503)
 
     return response

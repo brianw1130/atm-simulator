@@ -85,9 +85,7 @@ async def test_e2e_dep_02_cash_deposit_small_amount(
 
 
 @pytest.mark.asyncio
-async def test_e2e_dep_03_check_deposit(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_dep_03_check_deposit(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-DEP-03: Check Deposit $1,000 with check #4521."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["bob_card_number"], "5678")
@@ -131,9 +129,7 @@ async def test_e2e_dep_03_check_deposit(
 
 
 @pytest.mark.asyncio
-async def test_e2e_dep_04_deposit_to_savings(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_dep_04_deposit_to_savings(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-DEP-04: Deposit $300 cash to Alice's savings."""
     data = await seed_e2e_data(db_session)
 

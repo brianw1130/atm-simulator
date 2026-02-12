@@ -1,6 +1,6 @@
 """Cash cassette service for managing ATM bill inventory."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +10,7 @@ from src.atm.models.cassette import CashCassette
 TWENTY_DOLLAR_CENTS = 2_000
 
 
-async def get_cassette_status(session: AsyncSession) -> list[dict]:
+async def get_cassette_status(session: AsyncSession) -> list[dict[str, int]]:
     """Get current bill counts for all denominations.
 
     Args:
@@ -47,9 +47,7 @@ async def can_dispense(session: AsyncSession, amount_cents: int) -> bool:
     Returns:
         True if the ATM has enough bills to dispense the amount.
     """
-    stmt = select(CashCassette).where(
-        CashCassette.denomination_cents == TWENTY_DOLLAR_CENTS
-    )
+    stmt = select(CashCassette).where(CashCassette.denomination_cents == TWENTY_DOLLAR_CENTS)
     result = await session.execute(stmt)
     cassette = result.scalars().first()
 
@@ -61,7 +59,7 @@ async def can_dispense(session: AsyncSession, amount_cents: int) -> bool:
     return cassette.bill_count >= bills_needed
 
 
-async def dispense_bills(session: AsyncSession, amount_cents: int) -> dict:
+async def dispense_bills(session: AsyncSession, amount_cents: int) -> dict[str, int | str]:
     """Dispense bills and deduct from cassette inventory.
 
     If no cassettes exist, returns the denomination breakdown without
@@ -76,9 +74,7 @@ async def dispense_bills(session: AsyncSession, amount_cents: int) -> dict:
     """
     bills_needed = amount_cents // TWENTY_DOLLAR_CENTS
 
-    stmt = select(CashCassette).where(
-        CashCassette.denomination_cents == TWENTY_DOLLAR_CENTS
-    )
+    stmt = select(CashCassette).where(CashCassette.denomination_cents == TWENTY_DOLLAR_CENTS)
     result = await session.execute(stmt)
     cassette = result.scalars().first()
 
@@ -97,7 +93,7 @@ async def refill_cassette(
     session: AsyncSession,
     denomination_cents: int,
     bill_count: int,
-) -> dict:
+) -> dict[str, int]:
     """Add bills to a cassette (admin operation).
 
     Args:
@@ -108,9 +104,7 @@ async def refill_cassette(
     Returns:
         Dict with the cassette's denomination_cents, bill_count, and max_capacity.
     """
-    stmt = select(CashCassette).where(
-        CashCassette.denomination_cents == denomination_cents
-    )
+    stmt = select(CashCassette).where(CashCassette.denomination_cents == denomination_cents)
     result = await session.execute(stmt)
     cassette = result.scalars().first()
 
@@ -118,7 +112,7 @@ async def refill_cassette(
         cassette = CashCassette(
             denomination_cents=denomination_cents,
             bill_count=bill_count,
-            last_refilled_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            last_refilled_at=datetime.now(UTC).replace(tzinfo=None),
         )
         session.add(cassette)
     else:
@@ -126,7 +120,7 @@ async def refill_cassette(
             cassette.bill_count + bill_count,
             cassette.max_capacity,
         )
-        cassette.last_refilled_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        cassette.last_refilled_at = datetime.now(UTC).replace(tzinfo=None)
 
     await session.flush()
     return {
@@ -136,7 +130,7 @@ async def refill_cassette(
     }
 
 
-async def initialize_cassettes(session: AsyncSession) -> list[dict]:
+async def initialize_cassettes(session: AsyncSession) -> list[dict[str, int]]:
     """Seed default cassettes (500 x $20 bills = $10,000).
 
     If cassettes already exist, returns the current status without changes.
@@ -158,7 +152,7 @@ async def initialize_cassettes(session: AsyncSession) -> list[dict]:
         denomination_cents=TWENTY_DOLLAR_CENTS,
         bill_count=500,
         max_capacity=2000,
-        last_refilled_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        last_refilled_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(cassette)
     await session.flush()

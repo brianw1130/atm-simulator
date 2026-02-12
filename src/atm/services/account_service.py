@@ -101,12 +101,14 @@ async def get_account_balance(
     recent = []
     for txn in transactions:
         sign = "-" if txn.is_debit else "+"
-        recent.append({
-            "date": txn.created_at,
-            "description": txn.description,
-            "amount": f"{sign}{_format_cents(txn.amount_cents)}",
-            "balance_after": _format_cents(txn.balance_after_cents),
-        })
+        recent.append(
+            {
+                "date": txn.created_at,
+                "description": txn.description,
+                "amount": f"{sign}{_format_cents(txn.amount_cents)}",
+                "balance_after": _format_cents(txn.balance_after_cents),
+            }
+        )
 
     await log_event(
         session,

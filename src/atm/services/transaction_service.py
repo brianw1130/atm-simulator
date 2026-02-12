@@ -13,7 +13,7 @@ Responsibilities:
     - Reference number generation
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +34,7 @@ def _utcnow() -> datetime:
     Returns:
         A naive datetime representing the current UTC time.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 # Denomination constants (in cents)
@@ -189,9 +189,7 @@ async def withdraw(
 
     # Check cassette availability
     if not await can_dispense(session, amount_cents):
-        raise TransactionError(
-            "ATM cannot dispense this amount. Insufficient bills available."
-        )
+        raise TransactionError("ATM cannot dispense this amount. Insufficient bills available.")
 
     # Process withdrawal
     account.balance_cents -= amount_cents
@@ -309,7 +307,9 @@ async def deposit(
     account.available_balance_cents += available_immediately_cents
 
     ref = generate_reference_number()
-    description = f"{'Cash' if deposit_type == 'cash' else 'Check'} Deposit {_format_cents(amount_cents)}"
+    description = (
+        f"{'Cash' if deposit_type == 'cash' else 'Check'} Deposit {_format_cents(amount_cents)}"
+    )
     if check_number:
         description += f" (Check #{check_number})"
 

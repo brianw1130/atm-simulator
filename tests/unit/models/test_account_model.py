@@ -5,8 +5,6 @@ Coverage requirement: 100%
 Tests: balance_dollars, available_balance_dollars, masked_account_number, is_active
 """
 
-import pytest
-
 from src.atm.models.account import Account, AccountStatus, AccountType
 
 
@@ -64,9 +62,7 @@ class TestAvailableBalanceDollars:
         assert account.available_balance_dollars == "$0.00"
 
     def test_less_than_total(self):
-        account = _make_account(
-            balance_cents=50_000, available_balance_cents=20_000
-        )
+        account = _make_account(balance_cents=50_000, available_balance_cents=20_000)
         assert account.available_balance_dollars == "$200.00"
 
 

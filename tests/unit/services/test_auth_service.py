@@ -12,16 +12,16 @@ Tests:
 """
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.atm.config import settings
 from src.atm.models.account import Account, AccountStatus, AccountType
 from src.atm.models.card import ATMCard
 from src.atm.models.customer import Customer
-from src.atm.config import settings
 from src.atm.services.auth_service import (
     AuthenticationError,
     PinChangeError,
@@ -101,7 +101,7 @@ async def clear_sessions():
 
 class TestAuthenticate:
     async def test_successful_login(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session)
+        _customer, _account, _card = await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
 
         assert result["session_id"]
@@ -118,7 +118,7 @@ class TestAuthenticate:
         assert data is not None
 
     async def test_failed_attempts_reset_on_success(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session, failed_attempts=2)
+        _customer, _account, card = await _seed_card(db_session, failed_attempts=2)
         await authenticate(db_session, "4000-0001-0001", TEST_PIN)
 
         await db_session.refresh(card)
@@ -131,7 +131,7 @@ class TestAuthenticate:
             await authenticate(db_session, "4000-0001-0001", "9999")
 
     async def test_wrong_pin_increments_failed_attempts(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session)
+        _customer, _account, card = await _seed_card(db_session)
         with pytest.raises(AuthenticationError):
             await authenticate(db_session, "4000-0001-0001", "9999")
 
@@ -152,7 +152,7 @@ class TestAuthenticate:
         # making card.locked_until naive. auth_service line 134 subtracts
         # datetime.now(timezone.utc) (aware) from it, causing TypeError.
         # Workaround: patch datetime.now in auth_service to return naive UTC.
-        future = datetime.now(timezone.utc) + timedelta(minutes=30)
+        future = datetime.now(UTC) + timedelta(minutes=30)
         await _seed_card(db_session, locked_until=future)
 
         _real_now = datetime.now
@@ -169,7 +169,7 @@ class TestAuthenticate:
                 await authenticate(db_session, "4000-0001-0001", TEST_PIN)
 
     async def test_lockout_after_max_failures(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session, failed_attempts=2)
+        _customer, _account, card = await _seed_card(db_session, failed_attempts=2)
 
         with pytest.raises(AuthenticationError, match="Account locked"):
             await authenticate(db_session, "4000-0001-0001", "9999")
@@ -233,6 +233,7 @@ class TestValidateSession:
         old_activity = old_data["last_activity"]
 
         import time
+
         time.sleep(0.01)
 
         await validate_session(session_id)
@@ -272,17 +273,15 @@ class TestLogout:
 
 class TestChangePin:
     async def test_successful_pin_change(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session)
+        _customer, _account, _card = await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
-        response = await change_pin(
-            db_session, session_id, TEST_PIN, "4829", "4829"
-        )
+        response = await change_pin(db_session, session_id, TEST_PIN, "4829", "4829")
         assert response["message"] == "PIN changed successfully"
 
     async def test_new_pin_works_after_change(self, db_session: AsyncSession):
-        customer, account, card = await _seed_card(db_session)
+        _customer, _account, _card = await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
@@ -338,9 +337,7 @@ class TestChangePin:
 
     async def test_nonexistent_session_raises_session_error(self, db_session: AsyncSession):
         with pytest.raises(SessionError, match="expired"):
-            await change_pin(
-                db_session, "nonexistent-session", TEST_PIN, "4829", "4829"
-            )
+            await change_pin(db_session, "nonexistent-session", TEST_PIN, "4829", "4829")
 
     async def test_card_not_found_raises_session_error(self, db_session: AsyncSession):
         # Manually store a session in Redis pointing to a nonexistent card
@@ -357,6 +354,4 @@ class TestChangePin:
         )
 
         with pytest.raises(SessionError, match="Card not found"):
-            await change_pin(
-                db_session, "fake-session", TEST_PIN, "4829", "4829"
-            )
+            await change_pin(db_session, "fake-session", TEST_PIN, "4829", "4829")

@@ -1,6 +1,8 @@
 """ASGI middleware for correlation ID propagation."""
 
 import uuid
+from collections.abc import MutableMapping
+from typing import Any
 
 import structlog
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -27,21 +29,15 @@ class CorrelationIdMiddleware:
             return
 
         headers = dict(scope.get("headers", []))
-        correlation_id = (
-            headers.get(b"x-correlation-id", b"").decode() or str(uuid.uuid4())
-        )
+        correlation_id = headers.get(b"x-correlation-id", b"").decode() or str(uuid.uuid4())
 
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
 
-        async def send_with_correlation(message: dict) -> None:  # type: ignore[type-arg]
+        async def send_with_correlation(message: MutableMapping[str, Any]) -> None:
             if message["type"] == "http.response.start":
-                resp_headers: list[tuple[bytes, bytes]] = list(
-                    message.get("headers", [])
-                )
-                resp_headers.append(
-                    (b"x-correlation-id", correlation_id.encode())
-                )
+                resp_headers: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                resp_headers.append((b"x-correlation-id", correlation_id.encode()))
                 message["headers"] = resp_headers
             await send(message)
 

@@ -9,8 +9,9 @@ Routes:
     POST /transfer — Fund transfer
 """
 
-from fastapi import APIRouter, Header, HTTPException, status
 from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, status
 
 from src.atm.api import CurrentSession, DbSession
 from src.atm.schemas.transaction import (

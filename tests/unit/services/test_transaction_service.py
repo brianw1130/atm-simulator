@@ -14,7 +14,7 @@ Tests:
       destination not found, self-transfer, inactive dest, zero/negative, frozen source
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import select
@@ -94,36 +94,36 @@ class TestFormatCents:
 class TestNextBusinessDay:
     def test_monday_plus_one(self):
         # 2026-02-09 is a Monday
-        monday = datetime(2026, 2, 9, 12, 0, tzinfo=timezone.utc)
+        monday = datetime(2026, 2, 9, 12, 0, tzinfo=UTC)
         result = _next_business_day(monday, days=1)
         assert result.weekday() == 1  # Tuesday
 
     def test_friday_plus_one_skips_weekend(self):
         # 2026-02-13 is a Friday
-        friday = datetime(2026, 2, 13, 12, 0, tzinfo=timezone.utc)
+        friday = datetime(2026, 2, 13, 12, 0, tzinfo=UTC)
         result = _next_business_day(friday, days=1)
         assert result.weekday() == 0  # Monday
         assert result.day == 16
 
     def test_friday_plus_two(self):
-        friday = datetime(2026, 2, 13, 12, 0, tzinfo=timezone.utc)
+        friday = datetime(2026, 2, 13, 12, 0, tzinfo=UTC)
         result = _next_business_day(friday, days=2)
         assert result.weekday() == 1  # Tuesday
         assert result.day == 17
 
     def test_saturday_plus_one(self):
-        saturday = datetime(2026, 2, 14, 12, 0, tzinfo=timezone.utc)
+        saturday = datetime(2026, 2, 14, 12, 0, tzinfo=UTC)
         result = _next_business_day(saturday, days=1)
         assert result.weekday() == 0  # Monday
 
     def test_preserves_time(self):
-        monday = datetime(2026, 2, 9, 15, 30, 45, tzinfo=timezone.utc)
+        monday = datetime(2026, 2, 9, 15, 30, 45, tzinfo=UTC)
         result = _next_business_day(monday, days=1)
         assert result.hour == 15
         assert result.minute == 30
 
     def test_wednesday_plus_three(self):
-        wednesday = datetime(2026, 2, 11, 12, 0, tzinfo=timezone.utc)
+        wednesday = datetime(2026, 2, 11, 12, 0, tzinfo=UTC)
         result = _next_business_day(wednesday, days=3)
         assert result.weekday() == 0  # Monday
         assert result.day == 16
@@ -171,9 +171,7 @@ class TestWithdraw:
         account = await _seed_account(db_session)
         result = await withdraw(db_session, account.id, 10_000)
 
-        stmt = select(Transaction).where(
-            Transaction.reference_number == result["reference_number"]
-        )
+        stmt = select(Transaction).where(Transaction.reference_number == result["reference_number"])
         txn_result = await db_session.execute(stmt)
         txn = txn_result.scalars().first()
         assert txn is not None
@@ -263,9 +261,7 @@ class TestDeposit:
 
     async def test_check_small_all_held(self, db_session: AsyncSession):
         account = await _seed_account(db_session, balance_cents=100_000)
-        result = await deposit(
-            db_session, account.id, 15_000, "check", check_number="4521"
-        )
+        result = await deposit(db_session, account.id, 15_000, "check", check_number="4521")
 
         assert result["transaction_type"] == "DEPOSIT_CHECK"
         assert result["available_immediately"] == "$0.00"
@@ -278,9 +274,7 @@ class TestDeposit:
 
     async def test_check_large_all_held(self, db_session: AsyncSession):
         account = await _seed_account(db_session, balance_cents=100_000)
-        result = await deposit(
-            db_session, account.id, 100_000, "check", check_number="9999"
-        )
+        result = await deposit(db_session, account.id, 100_000, "check", check_number="9999")
 
         assert result["available_immediately"] == "$0.00"
         assert result["held_amount"] == "$1,000.00"
@@ -319,9 +313,7 @@ class TestDeposit:
         account = await _seed_account(db_session)
         result = await deposit(db_session, account.id, 15_000, "cash")
 
-        stmt = select(Transaction).where(
-            Transaction.reference_number == result["reference_number"]
-        )
+        stmt = select(Transaction).where(Transaction.reference_number == result["reference_number"])
         txn_result = await db_session.execute(stmt)
         txn = txn_result.scalars().first()
         assert txn is not None
@@ -330,26 +322,18 @@ class TestDeposit:
 
     async def test_check_deposit_stores_check_number(self, db_session: AsyncSession):
         account = await _seed_account(db_session)
-        result = await deposit(
-            db_session, account.id, 10_000, "check", check_number="CHK-123"
-        )
+        result = await deposit(db_session, account.id, 10_000, "check", check_number="CHK-123")
 
-        stmt = select(Transaction).where(
-            Transaction.reference_number == result["reference_number"]
-        )
+        stmt = select(Transaction).where(Transaction.reference_number == result["reference_number"])
         txn_result = await db_session.execute(stmt)
         txn = txn_result.scalars().first()
         assert txn.check_number == "CHK-123"
 
     async def test_check_description_includes_check_number(self, db_session: AsyncSession):
         account = await _seed_account(db_session)
-        result = await deposit(
-            db_session, account.id, 10_000, "check", check_number="4521"
-        )
+        result = await deposit(db_session, account.id, 10_000, "check", check_number="4521")
 
-        stmt = select(Transaction).where(
-            Transaction.reference_number == result["reference_number"]
-        )
+        stmt = select(Transaction).where(Transaction.reference_number == result["reference_number"])
         txn_result = await db_session.execute(stmt)
         txn = txn_result.scalars().first()
         assert "4521" in txn.description
@@ -363,7 +347,7 @@ class TestTransfer:
         source = await _seed_account(
             db_session, account_number="1000-0001-0001", balance_cents=525_000
         )
-        dest = await _seed_account(
+        await _seed_account(
             db_session,
             account_number="1000-0001-0002",
             balance_cents=1_250_000,
@@ -382,9 +366,7 @@ class TestTransfer:
         source = await _seed_account(
             db_session, account_number="1000-0001-0001", balance_cents=525_000
         )
-        await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         await transfer(db_session, source.id, "1000-0001-0002", 100_000)
 
@@ -409,9 +391,7 @@ class TestTransfer:
         source = await _seed_account(
             db_session, account_number="1000-0001-0001", balance_cents=525_000
         )
-        await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         await transfer(db_session, source.id, "1000-0001-0002", 50_000)
 
@@ -422,9 +402,7 @@ class TestTransfer:
         source = await _seed_account(
             db_session, account_number="1000-0001-0001", balance_cents=525_000
         )
-        dest = await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        dest = await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         await transfer(db_session, source.id, "1000-0001-0002", 50_000)
 
@@ -446,9 +424,7 @@ class TestTransfer:
         source = await _seed_account(
             db_session, account_number="1000-0001-0001", balance_cents=5_000
         )
-        await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         with pytest.raises(InsufficientFundsError, match="Insufficient funds"):
             await transfer(db_session, source.id, "1000-0001-0002", 50_000)
@@ -460,9 +436,7 @@ class TestTransfer:
             balance_cents=10_000_000,
             daily_transfer_used_cents=240_000,
         )
-        await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         with pytest.raises(DailyLimitExceededError, match="Daily transfer limit"):
             await transfer(db_session, source.id, "1000-0001-0002", 20_000)
@@ -528,9 +502,7 @@ class TestTransfer:
             balance_cents=525_000,
             status=AccountStatus.FROZEN,
         )
-        await _seed_account(
-            db_session, account_number="1000-0001-0002", balance_cents=0
-        )
+        await _seed_account(db_session, account_number="1000-0001-0002", balance_cents=0)
 
         with pytest.raises(AccountFrozenError):
             await transfer(db_session, source.id, "1000-0001-0002", 10_000)

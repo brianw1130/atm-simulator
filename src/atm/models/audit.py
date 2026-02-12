@@ -2,14 +2,15 @@
 
 import enum
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, JSON, String, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.atm.models import Base
 
 
-class AuditEventType(str, enum.Enum):
+class AuditEventType(enum.StrEnum):
     """Types of auditable events."""
 
     LOGIN_SUCCESS = "LOGIN_SUCCESS"
@@ -58,7 +59,7 @@ class AuditLog(Base):
     )
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # type: ignore[assignment]
+    details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

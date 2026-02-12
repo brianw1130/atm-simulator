@@ -5,8 +5,6 @@ Coverage requirement: 100%
 Tests mask_account_number from src/atm/utils/formatting.py.
 """
 
-import pytest
-
 from src.atm.utils.formatting import mask_account_number
 
 

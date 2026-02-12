@@ -61,9 +61,7 @@ async def test_e2e_stm_01_7_day_statement_generation(
 
 
 @pytest.mark.asyncio
-async def test_e2e_stm_02_30_day_statement(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_stm_02_30_day_statement(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-STM-02: 30-Day Statement."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["alice_card_number"], "7856")
@@ -82,9 +80,7 @@ async def test_e2e_stm_02_30_day_statement(
 
 
 @pytest.mark.asyncio
-async def test_e2e_stm_03_custom_date_range(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_stm_03_custom_date_range(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-STM-03: Custom Date Range."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["alice_card_number"], "7856")
@@ -107,9 +103,7 @@ async def test_e2e_stm_03_custom_date_range(
 
 
 @pytest.mark.asyncio
-async def test_e2e_stm_04_empty_statement(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_stm_04_empty_statement(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-STM-04: Empty Statement (Charlie, $0, no transactions)."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["charlie_card_number"], "9012")

@@ -4,8 +4,6 @@ E2E-AUTH-01 through E2E-AUTH-06 as specified in CLAUDE.md.
 Each test is independent with fresh database state.
 """
 
-import json
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -28,9 +26,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_e2e_auth_01_successful_login(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_auth_01_successful_login(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-AUTH-01: Successful Login."""
     data = await seed_e2e_data(db_session)
 
@@ -73,27 +69,21 @@ async def test_e2e_auth_02_wrong_pin_single_attempt(
     assert "Authentication failed" in result["data"]["detail"]
 
     # Verify failed_attempts incremented to 1
-    card_stmt = select(ATMCard).where(
-        ATMCard.card_number == data["alice_card_number"]
-    )
+    card_stmt = select(ATMCard).where(ATMCard.card_number == data["alice_card_number"])
     card_result = await db_session.execute(card_stmt)
     card = card_result.scalars().first()
     assert card is not None
     assert card.failed_attempts == 1
 
     # Verify audit log records failed attempt
-    audit_stmt = select(AuditLog).where(
-        AuditLog.event_type == AuditEventType.LOGIN_FAILED
-    )
+    audit_stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.LOGIN_FAILED)
     audit_result = await db_session.execute(audit_stmt)
     audit_entries = list(audit_result.scalars().all())
     assert len(audit_entries) >= 1
 
 
 @pytest.mark.asyncio
-async def test_e2e_auth_03_account_lockout(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_auth_03_account_lockout(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-AUTH-03: Account Lockout."""
     data = await seed_e2e_data(db_session)
 
@@ -109,9 +99,7 @@ async def test_e2e_auth_03_account_lockout(
     assert "locked" in result["data"]["detail"].lower()
 
     # Verify card is locked
-    card_stmt = select(ATMCard).where(
-        ATMCard.card_number == data["alice_card_number"]
-    )
+    card_stmt = select(ATMCard).where(ATMCard.card_number == data["alice_card_number"])
     card_result = await db_session.execute(card_stmt)
     card = card_result.scalars().first()
     assert card is not None
@@ -119,9 +107,7 @@ async def test_e2e_auth_03_account_lockout(
     assert card.locked_until is not None
 
     # Verify audit log records lockout event
-    audit_stmt = select(AuditLog).where(
-        AuditLog.event_type == AuditEventType.ACCOUNT_LOCKED
-    )
+    audit_stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.ACCOUNT_LOCKED)
     audit_result = await db_session.execute(audit_stmt)
     lockout_entries = list(audit_result.scalars().all())
     assert len(lockout_entries) >= 1
@@ -149,9 +135,7 @@ async def test_e2e_auth_04_login_to_locked_account(
 
 
 @pytest.mark.asyncio
-async def test_e2e_auth_05_session_timeout(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_auth_05_session_timeout(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-AUTH-05: Session Timeout."""
     data = await seed_e2e_data(db_session)
 
@@ -213,9 +197,7 @@ async def test_e2e_auth_06_successful_pin_change(
     assert new_result["data"]["customer_name"] == "Alice Johnson"
 
     # Step 6: Verify audit log records PIN change
-    audit_stmt = select(AuditLog).where(
-        AuditLog.event_type == AuditEventType.PIN_CHANGED
-    )
+    audit_stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.PIN_CHANGED)
     audit_result = await db_session.execute(audit_stmt)
     pin_change_entries = list(audit_result.scalars().all())
     assert len(pin_change_entries) >= 1

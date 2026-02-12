@@ -10,7 +10,7 @@ Responsibilities:
     - File management for generated statements
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,7 @@ def _utcnow() -> datetime:
     Returns:
         A naive datetime representing the current UTC time.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class StatementError(Exception):
@@ -81,11 +81,7 @@ async def generate_statement(
         StatementError: If the account is not found or dates are invalid.
     """
     # Load account with customer info (eager-load customer to avoid async lazy load)
-    stmt = (
-        select(Account)
-        .options(selectinload(Account.customer))
-        .where(Account.id == account_id)
-    )
+    stmt = select(Account).options(selectinload(Account.customer)).where(Account.id == account_id)
     result = await session.execute(stmt)
     account = result.scalars().first()
 
@@ -99,11 +95,18 @@ async def generate_statement(
     now = _utcnow()
     if start_date is not None and end_date is not None:
         range_start = datetime(
-            start_date.year, start_date.month, start_date.day,
+            start_date.year,
+            start_date.month,
+            start_date.day,
         )
         range_end = datetime(
-            end_date.year, end_date.month, end_date.day,
-            hour=23, minute=59, second=59, microsecond=999999,
+            end_date.year,
+            end_date.month,
+            end_date.day,
+            hour=23,
+            minute=59,
+            second=59,
+            microsecond=999999,
         )
     else:
         period_days = days if days is not None else 30
@@ -138,18 +141,18 @@ async def generate_statement(
     # Build transaction data for PDF
     txn_data: list[dict[str, object]] = []
     for txn in transactions:
-        txn_data.append({
-            "date": txn.created_at,
-            "description": txn.description,
-            "amount_cents": txn.amount_cents,
-            "balance_after_cents": txn.balance_after_cents,
-            "is_debit": txn.is_debit,
-        })
+        txn_data.append(
+            {
+                "date": txn.created_at,
+                "description": txn.description,
+                "amount_cents": txn.amount_cents,
+                "balance_after_cents": txn.balance_after_cents,
+                "is_debit": txn.is_debit,
+            }
+        )
 
     # Format period string
-    period_str = (
-        f"{range_start.strftime('%b %d, %Y')} - {range_end.strftime('%b %d, %Y')}"
-    )
+    period_str = f"{range_start.strftime('%b %d, %Y')} - {range_end.strftime('%b %d, %Y')}"
 
     # Generate file path
     timestamp = now.strftime("%Y%m%d_%H%M%S")

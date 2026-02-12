@@ -107,9 +107,7 @@ async def test_e2e_err_03_negative_amount_injection(
     assert d_resp.status_code == 422
 
     # Verify no transactions created
-    txn_stmt = select(Transaction).where(
-        Transaction.account_id == data["alice_checking"].id
-    )
+    txn_stmt = select(Transaction).where(Transaction.account_id == data["alice_checking"].id)
     txns = list((await db_session.execute(txn_stmt)).scalars().all())
     assert len(txns) == 0
 
@@ -161,9 +159,7 @@ async def test_e2e_err_04_maximum_value_boundaries(
 
 
 @pytest.mark.asyncio
-async def test_e2e_err_zero_amounts(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_err_zero_amounts(client: AsyncClient, db_session: AsyncSession) -> None:
     """Zero amounts are rejected by Pydantic (gt=0)."""
     data = await seed_e2e_data(db_session)
     session_id = await _login(client, data["alice_card_number"], "7856")

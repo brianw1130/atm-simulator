@@ -12,7 +12,9 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_health_path_not_logged(client: AsyncClient, caplog: pytest.LogCaptureFixture) -> None:
+async def test_health_path_not_logged(
+    client: AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
     """Requests to /health are not logged by the request logging middleware."""
     with caplog.at_level(logging.INFO, logger="atm.request"):
         await client.get("/health")
@@ -30,7 +32,9 @@ async def test_ready_path_not_logged(client: AsyncClient, caplog: pytest.LogCapt
 
 
 @pytest.mark.asyncio
-async def test_non_health_path_is_logged(client: AsyncClient, caplog: pytest.LogCaptureFixture) -> None:
+async def test_non_health_path_is_logged(
+    client: AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
     """Requests to non-health paths produce a request_completed log entry."""
     with caplog.at_level(logging.INFO, logger="atm.request"):
         await client.post(

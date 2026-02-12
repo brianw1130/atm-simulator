@@ -75,9 +75,7 @@ class TestGetCassetteStatus:
         status = await get_cassette_status(db_session)
         assert status == []
 
-    async def test_multiple_denominations_ordered(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_multiple_denominations_ordered(self, db_session: AsyncSession) -> None:
         """Multiple cassettes are returned ordered by denomination_cents."""
         await _add_cassette(db_session, denomination_cents=5000, bill_count=20)
         await _add_cassette(db_session, denomination_cents=2000, bill_count=100)
@@ -103,9 +101,7 @@ class TestCanDispense:
         result = await can_dispense(db_session, 10_000)  # $100 = 5 bills
         assert result is True
 
-    async def test_exact_bills_available_returns_true(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_exact_bills_available_returns_true(self, db_session: AsyncSession) -> None:
         """Requesting exactly the number of available bills returns True."""
         await _add_cassette(db_session, bill_count=5)
         await db_session.commit()
@@ -113,9 +109,7 @@ class TestCanDispense:
         result = await can_dispense(db_session, 10_000)  # 5 bills needed, 5 available
         assert result is True
 
-    async def test_not_enough_bills_returns_false(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_not_enough_bills_returns_false(self, db_session: AsyncSession) -> None:
         """Cassette with insufficient bills returns False."""
         await _add_cassette(db_session, bill_count=2)  # 2 x $20 = $40
         await db_session.commit()
@@ -159,9 +153,7 @@ class TestDispenseBills:
         await db_session.refresh(cassette)
         assert cassette.bill_count == 95
 
-    async def test_no_cassettes_backward_compat(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_no_cassettes_backward_compat(self, db_session: AsyncSession) -> None:
         """With no cassettes, dispense_bills still returns denomination breakdown."""
         result = await dispense_bills(db_session, 6_000)  # $60 = 3 bills
         assert result["twenties"] == 3
@@ -188,20 +180,16 @@ class TestDispenseBills:
 
 
 class TestRefillCassette:
-    async def test_existing_cassette_adds_bills(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_existing_cassette_adds_bills(self, db_session: AsyncSession) -> None:
         """Refilling an existing cassette increases the bill_count."""
-        cassette = await _add_cassette(db_session, bill_count=50, max_capacity=2000)
+        await _add_cassette(db_session, bill_count=50, max_capacity=2000)
         await db_session.commit()
 
         result = await refill_cassette(db_session, TWENTY_DOLLAR_CENTS, 100)
         assert result["bill_count"] == 150
         assert result["denomination_cents"] == TWENTY_DOLLAR_CENTS
 
-    async def test_existing_cassette_respects_max_capacity(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_existing_cassette_respects_max_capacity(self, db_session: AsyncSession) -> None:
         """Refilling beyond max_capacity caps at max_capacity."""
         await _add_cassette(db_session, bill_count=1900, max_capacity=2000)
         await db_session.commit()
@@ -216,14 +204,11 @@ class TestRefillCassette:
         assert result["denomination_cents"] == 5000
         assert result["bill_count"] == 200
 
-    async def test_refill_sets_last_refilled_at(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_refill_sets_last_refilled_at(self, db_session: AsyncSession) -> None:
         """Refilling updates the last_refilled_at timestamp."""
         cassette = await _add_cassette(db_session, bill_count=10)
         await db_session.commit()
 
-        old_refilled = cassette.last_refilled_at
         await refill_cassette(db_session, TWENTY_DOLLAR_CENTS, 5)
 
         await db_session.refresh(cassette)
@@ -244,9 +229,7 @@ class TestInitializeCassettes:
         assert result[0]["bill_count"] == 500
         assert result[0]["max_capacity"] == 2000
 
-    async def test_already_initialized_is_noop(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_already_initialized_is_noop(self, db_session: AsyncSession) -> None:
         """Calling initialize_cassettes when cassettes already exist does nothing."""
         await _add_cassette(db_session, bill_count=42, max_capacity=100)
         await db_session.commit()

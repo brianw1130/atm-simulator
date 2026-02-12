@@ -6,7 +6,7 @@ Tests AccountSummary, AccountListResponse, BalanceInquiryResponse, MiniStatement
 from src/atm/schemas/account.py.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.atm.models.account import AccountStatus, AccountType
 from src.atm.schemas.account import (
@@ -65,7 +65,7 @@ class TestAccountSummary:
 
 class TestMiniStatementEntry:
     def test_creation(self):
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         entry = MiniStatementEntry(
             date=now,
             description="Cash withdrawal",
@@ -80,7 +80,7 @@ class TestMiniStatementEntry:
 
 class TestBalanceInquiryResponse:
     def test_creation_with_transactions(self):
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         account = AccountSummary(
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,

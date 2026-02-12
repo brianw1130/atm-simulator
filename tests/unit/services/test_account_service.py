@@ -110,9 +110,7 @@ class TestFormatCents:
 class TestGetCustomerAccounts:
     async def test_returns_active_accounts(self, db_session: AsyncSession):
         customer = await _seed_customer(db_session)
-        await _seed_account(
-            db_session, customer.id, account_number="1000-0001-0001"
-        )
+        await _seed_account(db_session, customer.id, account_number="1000-0001-0001")
         await _seed_account(
             db_session,
             customer.id,
@@ -125,9 +123,7 @@ class TestGetCustomerAccounts:
 
     async def test_excludes_closed_accounts(self, db_session: AsyncSession):
         customer = await _seed_customer(db_session)
-        await _seed_account(
-            db_session, customer.id, account_number="1000-0001-0001"
-        )
+        await _seed_account(db_session, customer.id, account_number="1000-0001-0001")
         await _seed_account(
             db_session,
             customer.id,
@@ -161,12 +157,8 @@ class TestGetCustomerAccounts:
 
     async def test_ordered_by_account_number(self, db_session: AsyncSession):
         customer = await _seed_customer(db_session)
-        await _seed_account(
-            db_session, customer.id, account_number="1000-0001-0002"
-        )
-        await _seed_account(
-            db_session, customer.id, account_number="1000-0001-0001"
-        )
+        await _seed_account(db_session, customer.id, account_number="1000-0001-0002")
+        await _seed_account(db_session, customer.id, account_number="1000-0001-0001")
 
         accounts = await get_customer_accounts(db_session, customer.id)
         assert accounts[0].account_number == "1000-0001-0001"
@@ -179,9 +171,7 @@ class TestGetCustomerAccounts:
 class TestGetAccountBalance:
     async def test_returns_balance_info(self, db_session: AsyncSession):
         customer = await _seed_customer(db_session)
-        account = await _seed_account(
-            db_session, customer.id, balance_cents=525_000
-        )
+        account = await _seed_account(db_session, customer.id, balance_cents=525_000)
 
         result = await get_account_balance(db_session, account.id)
         assert result["account"]["balance"] == "$5,250.00"
@@ -204,12 +194,14 @@ class TestGetAccountBalance:
         account = await _seed_account(db_session, customer.id)
 
         await _seed_transaction(
-            db_session, account.id,
+            db_session,
+            account.id,
             reference_number="REF-test-00000001",
             description="Withdrawal 1",
         )
         await _seed_transaction(
-            db_session, account.id,
+            db_session,
+            account.id,
             reference_number="REF-test-00000002",
             description="Withdrawal 2",
         )
@@ -223,7 +215,8 @@ class TestGetAccountBalance:
 
         for i in range(7):
             await _seed_transaction(
-                db_session, account.id,
+                db_session,
+                account.id,
                 reference_number=f"REF-test-{i:08d}",
                 description=f"Txn {i}",
             )
@@ -243,7 +236,8 @@ class TestGetAccountBalance:
         account = await _seed_account(db_session, customer.id)
 
         await _seed_transaction(
-            db_session, account.id,
+            db_session,
+            account.id,
             txn_type=TransactionType.WITHDRAWAL,
             amount_cents=10_000,
             reference_number="REF-test-debit001",
@@ -257,7 +251,8 @@ class TestGetAccountBalance:
         account = await _seed_account(db_session, customer.id)
 
         await _seed_transaction(
-            db_session, account.id,
+            db_session,
+            account.id,
             txn_type=TransactionType.DEPOSIT_CASH,
             amount_cents=50_000,
             reference_number="REF-test-credit01",
@@ -271,7 +266,5 @@ class TestGetAccountBalance:
         customer = await _seed_customer(db_session)
         account = await _seed_account(db_session, customer.id)
 
-        result = await get_account_balance(
-            db_session, account.id, session_id="test-session"
-        )
+        result = await get_account_balance(db_session, account.id, session_id="test-session")
         assert result is not None

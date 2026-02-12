@@ -6,7 +6,6 @@ Tests: model creation with all fields, default values (role, is_active).
 """
 
 import pytest
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.models.admin import AdminUser

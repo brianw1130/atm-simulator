@@ -28,9 +28,8 @@ async def main() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with session_factory() as session:
-        async with session.begin():
-            await seed_database(session)
+    async with session_factory() as session, session.begin():
+        await seed_database(session)
 
     await engine.dispose()
     print("Database seeded successfully.")

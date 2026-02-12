@@ -24,9 +24,7 @@ async def _login(client: AsyncClient, card_number: str, pin: str) -> str:
 
 async def _setup_alice_with_both_accounts(db_session: AsyncSession) -> dict:
     """Seed Alice with checking ($5,250) and savings ($12,500) accounts."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     checking = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -82,16 +80,12 @@ async def test_transfer_own_accounts(client: AsyncClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_transfer_external_account(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_transfer_external_account(client: AsyncClient, db_session: AsyncSession) -> None:
     """Transfer to another customer's account returns 201."""
-    alice_data = await _setup_alice_with_both_accounts(db_session)
+    await _setup_alice_with_both_accounts(db_session)
 
     # Create Bob's account
-    bob = await create_test_customer(
-        db_session, first_name="Bob", last_name="Williams"
-    )
+    bob = await create_test_customer(db_session, first_name="Bob", last_name="Williams")
     await create_test_account(
         db_session,
         customer_id=bob.id,
@@ -117,20 +111,16 @@ async def test_transfer_external_account(
 
 
 @pytest.mark.asyncio
-async def test_transfer_insufficient_funds(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_transfer_insufficient_funds(client: AsyncClient, db_session: AsyncSession) -> None:
     """Transfer more than available balance returns 400."""
-    customer = await create_test_customer(
-        db_session, first_name="Charlie", last_name="Davis"
-    )
+    customer = await create_test_customer(db_session, first_name="Charlie", last_name="Davis")
     checking = await create_test_account(
         db_session,
         customer_id=customer.id,
         account_number="1000-0003-0001",
         balance_cents=0,
     )
-    savings = await create_test_account(
+    await create_test_account(
         db_session,
         customer_id=customer.id,
         account_number="1000-0003-0002",
@@ -161,9 +151,7 @@ async def test_transfer_insufficient_funds(
 
 
 @pytest.mark.asyncio
-async def test_transfer_daily_limit_exceeded(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_transfer_daily_limit_exceeded(client: AsyncClient, db_session: AsyncSession) -> None:
     """Second transfer exceeding $2,500 daily limit returns 400."""
     await _setup_alice_with_both_accounts(db_session)
     session_id = await _login(client, "4000-0001-0001", "7856")
@@ -214,9 +202,7 @@ async def test_transfer_to_nonexistent_account(
 
 
 @pytest.mark.asyncio
-async def test_transfer_to_same_account(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_transfer_to_same_account(client: AsyncClient, db_session: AsyncSession) -> None:
     """Transfer to the same account (self-transfer) returns 400."""
     await _setup_alice_with_both_accounts(db_session)
     session_id = await _login(client, "4000-0001-0001", "7856")

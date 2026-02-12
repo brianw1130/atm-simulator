@@ -1,7 +1,7 @@
 """FastAPI application factory and startup configuration."""
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
@@ -43,7 +43,7 @@ def create_app() -> FastAPI:
 
     # Rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Middleware order matters: outermost first.
     # CorrelationId runs first (outermost), then RequestLogging.
@@ -61,18 +61,16 @@ def _register_routers(app: FastAPI) -> None:
     Args:
         app: The FastAPI application instance.
     """
-    from src.atm.api.auth import router as auth_router
     from src.atm.api.accounts import router as accounts_router
+    from src.atm.api.auth import router as auth_router
     from src.atm.api.health import router as health_router
-    from src.atm.api.transactions import router as transactions_router
     from src.atm.api.statements import router as statements_router
+    from src.atm.api.transactions import router as transactions_router
 
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(accounts_router, prefix="/api/v1/accounts", tags=["Accounts"])
-    app.include_router(
-        transactions_router, prefix="/api/v1/transactions", tags=["Transactions"]
-    )
+    app.include_router(transactions_router, prefix="/api/v1/transactions", tags=["Transactions"])
     app.include_router(statements_router, prefix="/api/v1/statements", tags=["Statements"])
 
     from src.atm.api.admin import router as admin_router

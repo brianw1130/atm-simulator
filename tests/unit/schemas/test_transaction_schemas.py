@@ -6,7 +6,7 @@ Tests WithdrawalRequest, DepositRequest, TransferRequest, StatementRequest,
 and response schemas from src/atm/schemas/transaction.py.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -24,7 +24,6 @@ from src.atm.schemas.transaction import (
     WithdrawalRequest,
     WithdrawalResponse,
 )
-
 
 # ── WithdrawalRequest ────────────────────────────────────────────────────────
 
@@ -76,24 +75,18 @@ class TestDepositRequest:
         assert req.check_number is None
 
     def test_valid_check_deposit_with_check_number(self):
-        req = DepositRequest(
-            amount_cents=100000, deposit_type="check", check_number="4521"
-        )
+        req = DepositRequest(amount_cents=100000, deposit_type="check", check_number="4521")
         assert req.deposit_type == "check"
         assert req.check_number == "4521"
 
     def test_check_deposit_with_explicit_none_check_number_rejected(self):
         with pytest.raises(ValidationError) as exc_info:
-            DepositRequest(
-                amount_cents=100000, deposit_type="check", check_number=None
-            )
+            DepositRequest(amount_cents=100000, deposit_type="check", check_number=None)
         assert "Check number is required" in str(exc_info.value)
 
     def test_check_deposit_with_empty_check_number_rejected(self):
         with pytest.raises(ValidationError) as exc_info:
-            DepositRequest(
-                amount_cents=100000, deposit_type="check", check_number=""
-            )
+            DepositRequest(amount_cents=100000, deposit_type="check", check_number="")
         assert "Check number is required" in str(exc_info.value)
 
     def test_cash_deposit_without_check_number_accepted(self):
@@ -114,9 +107,7 @@ class TestDepositRequest:
 
     def test_check_number_too_long_rejected(self):
         with pytest.raises(ValidationError):
-            DepositRequest(
-                amount_cents=5000, deposit_type="check", check_number="A" * 21
-            )
+            DepositRequest(amount_cents=5000, deposit_type="check", check_number="A" * 21)
 
 
 # ── TransferRequest ──────────────────────────────────────────────────────────
@@ -124,9 +115,7 @@ class TestDepositRequest:
 
 class TestTransferRequest:
     def test_valid_transfer(self):
-        req = TransferRequest(
-            destination_account_number="1000-0002-0001", amount_cents=100000
-        )
+        req = TransferRequest(destination_account_number="1000-0002-0001", amount_cents=100000)
         assert req.destination_account_number == "1000-0002-0001"
         assert req.amount_cents == 100000
 
@@ -136,26 +125,18 @@ class TestTransferRequest:
 
     def test_destination_too_long_rejected(self):
         with pytest.raises(ValidationError):
-            TransferRequest(
-                destination_account_number="A" * 21, amount_cents=100000
-            )
+            TransferRequest(destination_account_number="A" * 21, amount_cents=100000)
 
     def test_zero_amount_rejected(self):
         with pytest.raises(ValidationError):
-            TransferRequest(
-                destination_account_number="1000-0002-0001", amount_cents=0
-            )
+            TransferRequest(destination_account_number="1000-0002-0001", amount_cents=0)
 
     def test_negative_amount_rejected(self):
         with pytest.raises(ValidationError):
-            TransferRequest(
-                destination_account_number="1000-0002-0001", amount_cents=-5000
-            )
+            TransferRequest(destination_account_number="1000-0002-0001", amount_cents=-5000)
 
     def test_small_valid_amount(self):
-        req = TransferRequest(
-            destination_account_number="1000-0002-0001", amount_cents=1
-        )
+        req = TransferRequest(destination_account_number="1000-0002-0001", amount_cents=1)
         assert req.amount_cents == 1
 
 
@@ -203,9 +184,7 @@ class TestStatementRequest:
     def test_end_before_start_rejected(self):
         today = date.today()
         with pytest.raises(ValidationError) as exc_info:
-            StatementRequest(
-                start_date=today, end_date=today - timedelta(days=10)
-            )
+            StatementRequest(start_date=today, end_date=today - timedelta(days=10))
         assert "end_date must not be before start_date" in str(exc_info.value)
 
     def test_future_end_date_rejected(self):
@@ -262,16 +241,12 @@ class TestErrorResponse:
 
 class TestDenominationBreakdown:
     def test_creation(self):
-        breakdown = DenominationBreakdown(
-            twenties=5, total_bills=5, total_amount="$100.00"
-        )
+        breakdown = DenominationBreakdown(twenties=5, total_bills=5, total_amount="$100.00")
         assert breakdown.twenties == 5
         assert breakdown.total_bills == 5
 
     def test_zero_bills(self):
-        breakdown = DenominationBreakdown(
-            twenties=0, total_bills=0, total_amount="$0.00"
-        )
+        breakdown = DenominationBreakdown(twenties=0, total_bills=0, total_amount="$0.00")
         assert breakdown.twenties == 0
 
 
@@ -283,16 +258,14 @@ class TestWithdrawalResponse:
             amount="$100.00",
             balance_after="$5,150.00",
             message="Withdrawal successful",
-            denominations=DenominationBreakdown(
-                twenties=5, total_bills=5, total_amount="$100.00"
-            ),
+            denominations=DenominationBreakdown(twenties=5, total_bills=5, total_amount="$100.00"),
         )
         assert resp.denominations.twenties == 5
 
 
 class TestDepositResponse:
     def test_creation_with_hold(self):
-        hold_time = datetime.now(tz=timezone.utc) + timedelta(days=1)
+        hold_time = datetime.now(tz=UTC) + timedelta(days=1)
         resp = DepositResponse(
             reference_number="REF-abc-12345678",
             transaction_type="DEPOSIT_CASH",

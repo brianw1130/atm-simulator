@@ -18,12 +18,11 @@ import json
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.atm.config import settings
 from src.atm.models.account import Account, AccountStatus, AccountType
 from src.atm.models.audit import AuditEventType, AuditLog
-from src.atm.models.customer import Customer
 from src.atm.services.admin_service import (
     ADMIN_SESSION_PREFIX,
-    ADMIN_SESSION_TTL,
     AdminAuthError,
     admin_logout,
     authenticate_admin,
@@ -36,7 +35,6 @@ from src.atm.services.admin_service import (
 )
 from src.atm.services.redis_client import get_redis
 from src.atm.utils.security import verify_pin
-from src.atm.config import settings
 from tests.factories import create_test_account, create_test_customer
 
 pytestmark = pytest.mark.asyncio
@@ -61,9 +59,7 @@ async def _create_admin(db_session: AsyncSession, *, is_active: bool = True) -> 
 
 async def _seed_accounts(db_session: AsyncSession) -> tuple[int, int]:
     """Seed two accounts (checking + savings) for testing. Return their IDs."""
-    customer = await create_test_customer(
-        db_session, first_name="Alice", last_name="Johnson"
-    )
+    customer = await create_test_customer(db_session, first_name="Alice", last_name="Johnson")
     checking = await create_test_account(
         db_session,
         customer_id=customer.id,
@@ -104,24 +100,18 @@ class TestAuthenticateAdmin:
         assert session_data["username"] == TEST_ADMIN_USERNAME
         assert session_data["role"] == "admin"
 
-    async def test_invalid_password_raises_auth_error(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_invalid_password_raises_auth_error(self, db_session: AsyncSession) -> None:
         """Wrong password raises AdminAuthError."""
         await _create_admin(db_session)
         with pytest.raises(AdminAuthError, match="Invalid credentials"):
             await authenticate_admin(db_session, TEST_ADMIN_USERNAME, "wrongpass")
 
-    async def test_nonexistent_user_raises_auth_error(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_nonexistent_user_raises_auth_error(self, db_session: AsyncSession) -> None:
         """A username that does not exist raises AdminAuthError."""
         with pytest.raises(AdminAuthError, match="Invalid credentials"):
             await authenticate_admin(db_session, "nobody", "anypass")
 
-    async def test_inactive_user_raises_auth_error(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_inactive_user_raises_auth_error(self, db_session: AsyncSession) -> None:
         """An inactive admin user cannot authenticate."""
         await _create_admin(db_session, is_active=False)
         with pytest.raises(AdminAuthError, match="Invalid credentials"):
@@ -134,9 +124,7 @@ class TestAuthenticateAdmin:
 
 
 class TestValidateAdminSession:
-    async def test_valid_token_returns_session_data(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_valid_token_returns_session_data(self, db_session: AsyncSession) -> None:
         """A valid token returns the stored admin session dict."""
         await _create_admin(db_session)
         token = await authenticate_admin(db_session, TEST_ADMIN_USERNAME, TEST_ADMIN_PASSWORD)
@@ -146,16 +134,12 @@ class TestValidateAdminSession:
         assert data["username"] == TEST_ADMIN_USERNAME
         assert "admin_id" in data
 
-    async def test_expired_or_missing_token_returns_none(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_expired_or_missing_token_returns_none(self, db_session: AsyncSession) -> None:
         """An invalid/missing token returns None."""
         result = await validate_admin_session("nonexistent-token-abc")
         assert result is None
 
-    async def test_ttl_refreshed_on_validation(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_ttl_refreshed_on_validation(self, db_session: AsyncSession) -> None:
         """Validating a session refreshes its TTL in Redis."""
         await _create_admin(db_session)
         token = await authenticate_admin(db_session, TEST_ADMIN_USERNAME, TEST_ADMIN_PASSWORD)
@@ -193,9 +177,7 @@ class TestAdminLogout:
         data = await redis.get(f"{ADMIN_SESSION_PREFIX}{token}")
         assert data is None
 
-    async def test_already_expired_session_returns_false(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_already_expired_session_returns_false(self, db_session: AsyncSession) -> None:
         """Logging out a non-existent session returns False."""
         result = await admin_logout("nonexistent-token-xyz")
         assert result is False
@@ -207,9 +189,7 @@ class TestAdminLogout:
 
 
 class TestGetAllAccounts:
-    async def test_returns_accounts_with_customer_info(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_returns_accounts_with_customer_info(self, db_session: AsyncSession) -> None:
         """Returns a list of account dicts including customer name and balance."""
         await _seed_accounts(db_session)
         accounts = await get_all_accounts(db_session)
@@ -222,9 +202,7 @@ class TestGetAllAccounts:
         assert checking["status"] == "ACTIVE"
         assert checking["customer_name"] == "Alice Johnson"
 
-    async def test_empty_database_returns_empty_list(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_empty_database_returns_empty_list(self, db_session: AsyncSession) -> None:
         """No accounts in the DB returns an empty list."""
         accounts = await get_all_accounts(db_session)
         assert accounts == []
@@ -332,9 +310,7 @@ class TestGetAuditLogs:
 
 
 class TestCreateAdminUser:
-    async def test_creates_admin_with_hashed_password(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_creates_admin_with_hashed_password(self, db_session: AsyncSession) -> None:
         """create_admin_user stores a bcrypt-hashed password, not plaintext."""
         admin = await create_admin_user(db_session, "newadmin", "mypassword123")
         await db_session.commit()
@@ -347,13 +323,9 @@ class TestCreateAdminUser:
         # But it should verify correctly
         assert verify_pin("mypassword123", admin.password_hash, settings.pin_pepper)
 
-    async def test_creates_admin_with_custom_role(
-        self, db_session: AsyncSession
-    ) -> None:
+    async def test_creates_admin_with_custom_role(self, db_session: AsyncSession) -> None:
         """create_admin_user accepts a custom role."""
-        admin = await create_admin_user(
-            db_session, "superadmin", "pass456", role="superadmin"
-        )
+        admin = await create_admin_user(db_session, "superadmin", "pass456", role="superadmin")
         await db_session.commit()
 
         assert admin.role == "superadmin"
