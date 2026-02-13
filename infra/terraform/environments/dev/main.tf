@@ -39,6 +39,7 @@ module "security" {
   project_name = var.project_name
   environment  = var.environment
   vpc_id       = module.networking.vpc_id
+  vpc_cidr     = module.networking.vpc_cidr
 }
 
 # ── ECR Repository ───────────────────────────────────────────────────
