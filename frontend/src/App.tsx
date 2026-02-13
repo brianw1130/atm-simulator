@@ -38,16 +38,63 @@ import {
 import type { ATMScreen } from "./state/types";
 import { logout as apiLogout } from "./api/endpoints";
 
+const noopHandlers = {
+  onDigit: () => {},
+  onClear: () => {},
+  onCancel: () => {},
+  onEnter: () => {},
+};
+
+/** Resolve the active screen's keypad handlers at call time.
+ *  Reading static properties lazily avoids stale refs caused by
+ *  AnimatePresence delaying child mounts. */
+function getScreenHandlers(
+  screen: ATMScreen,
+  pending: unknown,
+) {
+  switch (screen) {
+    case "welcome":
+      return WelcomeScreen.keypadHandlers;
+    case "pin_entry":
+      return PinEntryScreen.keypadHandlers;
+    case "withdrawal":
+      return WithdrawalScreen.keypadHandlers;
+    case "deposit":
+      return pending ? DepositScreen.keypadHandlers : noopHandlers;
+    case "transfer":
+      return TransferScreen.keypadHandlers;
+    case "pin_change":
+      return PinChangeScreen.keypadHandlers;
+    default:
+      return noopHandlers;
+  }
+}
+
 export default function App() {
   const { state, dispatch } = useATMContext();
   const { showWarning, secondsLeft } = useIdleTimer();
   const reducedMotion = useReducedMotion();
 
+  // Track current screen in a ref so keypad handlers can read it at
+  // event time (after AnimatePresence has mounted the screen component).
+  const screenRef = useRef(state.currentScreen);
+  screenRef.current = state.currentScreen;
+  const pendingRef = useRef(state.pendingTransaction);
+  pendingRef.current = state.pendingTransaction;
+
   const keypadRef = useRef({
-    onDigit: (_: string) => {},
-    onClear: () => {},
-    onCancel: () => {},
-    onEnter: () => {},
+    onDigit: (d: string) => {
+      getScreenHandlers(screenRef.current, pendingRef.current).onDigit(d);
+    },
+    onClear: () => {
+      getScreenHandlers(screenRef.current, pendingRef.current).onClear();
+    },
+    onCancel: () => {
+      getScreenHandlers(screenRef.current, pendingRef.current).onCancel();
+    },
+    onEnter: () => {
+      getScreenHandlers(screenRef.current, pendingRef.current).onEnter();
+    },
   });
 
   const navigateTo = useCallback(
@@ -113,29 +160,6 @@ export default function App() {
         return <MaintenanceModeScreen />;
     }
   };
-
-  // Wire keypad to the current screen's handlers
-  const screen = state.currentScreen;
-  if (screen === "welcome") {
-    keypadRef.current = WelcomeScreen.keypadHandlers;
-  } else if (screen === "pin_entry") {
-    keypadRef.current = PinEntryScreen.keypadHandlers;
-  } else if (screen === "withdrawal") {
-    keypadRef.current = WithdrawalScreen.keypadHandlers;
-  } else if (screen === "deposit" && state.pendingTransaction) {
-    keypadRef.current = DepositScreen.keypadHandlers;
-  } else if (screen === "transfer") {
-    keypadRef.current = TransferScreen.keypadHandlers;
-  } else if (screen === "pin_change") {
-    keypadRef.current = PinChangeScreen.keypadHandlers;
-  } else {
-    keypadRef.current = {
-      onDigit: () => {},
-      onClear: () => {},
-      onCancel: () => {},
-      onEnter: () => {},
-    };
-  }
 
   // Build side button config for left/right panels
   const buildSideButtons = (
