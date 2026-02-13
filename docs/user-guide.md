@@ -52,6 +52,41 @@ Use one of the test accounts listed in [Test Accounts](#test-accounts) below. Fo
 
 ---
 
+## Web UI (v2.0)
+
+The ATM Simulator includes a skeuomorphic web interface that renders a realistic ATM kiosk in the browser. Open `http://localhost:8000` after starting the application.
+
+### Using the Web ATM
+
+1. **Insert Card** -- Type a card number (e.g., `1000-0001-0001`) using the on-screen keypad or your physical keyboard, then press Enter.
+
+2. **Enter PIN** -- Type your 4-6 digit PIN. Input is masked. Press Enter to authenticate or Cancel to return.
+
+3. **Main Menu** -- Use the side buttons to navigate:
+   - **Left buttons:** Balance Inquiry, Withdraw Cash, Deposit, Transfer Funds
+   - **Right buttons:** Account Statement, Change PIN, -, Logout
+
+4. **Transactions** -- Follow on-screen prompts. Withdrawal amounts can be selected via quick-select side buttons ($20-$200) or entered via the keypad. Transfers and deposits use the keypad for amount entry.
+
+5. **Receipts** -- After completing a transaction, the receipt printer animates and you can choose "Another Transaction" or "Done" (logout).
+
+### Keyboard Shortcuts
+
+The physical keyboard maps to the ATM keypad:
+
+| Key | ATM Function |
+|---|---|
+| `0-9` | Numeric keypad digits |
+| `Enter` | Enter / Confirm |
+| `Backspace` | Clear / Correct |
+| `Escape` | Cancel / Back |
+
+### Session Timeout
+
+After 2 minutes of inactivity, a 30-second countdown warning appears. Press any key to reset the timer. If the countdown reaches zero, the session expires and the ATM returns to the welcome screen.
+
+---
+
 ## Terminal UI
 
 The ATM simulator includes a terminal-based user interface built with [Textual](https://textual.textualize.io/).

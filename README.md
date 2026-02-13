@@ -2,10 +2,11 @@
 
 A full-featured Python ATM (Automated Teller Machine) simulator that replicates real-world ATM functionality including PIN authentication, cash withdrawals, deposits, fund transfers, balance inquiries, and PDF statement generation.
 
-Built with **FastAPI**, **SQLAlchemy 2.0**, **PostgreSQL**, and **Textual** (terminal UI).
+Built with **FastAPI**, **SQLAlchemy 2.0**, **PostgreSQL**, **React 18** (skeuomorphic web UI), and **Textual** (terminal UI).
 
 ## Features
 
+- **Skeuomorphic Web UI** — Realistic ATM kiosk in the browser with metallic housing, CRT screen glow, animated card slot, cash dispenser, and receipt printer (React + Framer Motion)
 - **PIN Authentication** — Card number + PIN login with lockout after 3 failed attempts
 - **Cash Withdrawal** — Quick-withdraw presets and custom amounts (multiples of $20), daily limits
 - **Cash & Check Deposits** — Hold policies simulating real bank availability schedules
@@ -13,8 +14,9 @@ Built with **FastAPI**, **SQLAlchemy 2.0**, **PostgreSQL**, and **Textual** (ter
 - **Balance Inquiry** — Available and total balance with mini-statement (last 5 transactions)
 - **PDF Statements** — Generate account statements for configurable date ranges
 - **PIN Management** — Secure PIN change with complexity validation
+- **Session Timeout** — 2-minute idle timer with 30-second countdown warning
 - **Audit Logging** — Every authentication attempt and transaction is logged
-- **Overdraft Protection** — Optional linked-account coverage for insufficient funds
+- **Admin Panel** — Account management, maintenance mode, audit log viewer
 
 ## Quick Start
 
@@ -40,7 +42,11 @@ docker compose exec app alembic upgrade head
 docker compose exec app python -m scripts.seed_db
 ```
 
-The API will be available at `http://localhost:8000`. Interactive API docs are at `http://localhost:8000/docs`.
+**Web UI:** Open `http://localhost:8000` in your browser to use the ATM.
+
+**API Docs:** Interactive Swagger docs at `http://localhost:8000/docs`.
+
+**Development mode:** The Vite dev server runs at `http://localhost:5173` with hot module replacement.
 
 ### Run the Terminal UI
 
@@ -63,47 +69,46 @@ docker compose exec app python -m src.atm.ui.app
 ### Local Setup (without Docker)
 
 ```bash
-# Install dependencies
+# Install Python dependencies
 pip install -e ".[dev]"
 
 # Set up environment variables
 cp .env.example .env
 # Edit .env to point DATABASE_URL to your local PostgreSQL
 
-# Run migrations
+# Run migrations and seed data
 alembic upgrade head
-
-# Seed the database
 python -m scripts.seed_db
 
 # Start the API server
 uvicorn src.atm.main:app --reload
 
-# Run tests
-pytest
+# In a separate terminal, start the frontend dev server
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Running Tests
 
 ```bash
-# Full test suite with coverage
-pytest --cov=src/atm --cov-report=term-missing --cov-report=html
+# Python test suite (582 tests)
+pytest --cov=src/atm --cov-report=term-missing
 
-# Unit tests only
-pytest tests/unit/
+# Frontend unit tests (223 tests)
+cd frontend && npx vitest run --coverage
 
-# Integration tests only
-pytest tests/integration/
-
-# E2E tests only
-pytest tests/e2e/
+# Frontend browser E2E tests (36 tests)
+cd frontend && npx playwright test
 
 # Type checking
 mypy src/
+cd frontend && npx tsc --noEmit
 
 # Linting
 ruff check src/ tests/
 ruff format --check src/ tests/
+cd frontend && npx eslint . --max-warnings=0
 ```
 
 ### Coverage Requirements
@@ -113,7 +118,8 @@ ruff format --check src/ tests/
 | `services/`, `utils/security.py`, `models/`, `schemas/` | **100%** |
 | `api/`, `pdf/` | **95%+** |
 | `ui/` | **90%+** |
-| **Overall** | **95%+** |
+| Frontend (lines/statements) | **90%+** |
+| **Overall (Python)** | **95%+** |
 
 See `tests/COVERAGE_EXCLUSIONS.md` for documented exclusions.
 
@@ -121,36 +127,49 @@ See `tests/COVERAGE_EXCLUSIONS.md` for documented exclusions.
 
 ```
 atm-simulator/
-├── src/atm/           # Application source code
-│   ├── api/           # FastAPI route handlers
-│   ├── models/        # SQLAlchemy ORM models
-│   ├── schemas/       # Pydantic request/response schemas
-│   ├── services/      # Business logic layer
-│   ├── db/            # Database session and seeding
-│   ├── ui/            # Textual terminal UI
-│   ├── pdf/           # PDF statement generation
-│   └── utils/         # Security, formatting utilities
-├── tests/             # Test suite (unit, integration, e2e)
-├── alembic/           # Database migrations
-├── docs/              # Project documentation
-├── scripts/           # Utility scripts
-└── docker-compose.yml # Local development environment
+├── src/atm/              # Python backend
+│   ├── api/              # FastAPI route handlers
+│   ├── models/           # SQLAlchemy ORM models
+│   ├── schemas/          # Pydantic request/response schemas
+│   ├── services/         # Business logic layer
+│   ├── db/               # Database session and seeding
+│   ├── ui/               # Textual terminal UI
+│   ├── pdf/              # PDF statement generation
+│   └── utils/            # Security, formatting utilities
+├── frontend/             # React web UI (v2.0)
+│   ├── src/
+│   │   ├── components/   # ATM housing + 17 screen components
+│   │   ├── state/        # useReducer state machine (17 screens, 16 actions)
+│   │   ├── api/          # Axios client + typed endpoint functions
+│   │   ├── hooks/        # useATMContext, useIdleTimer
+│   │   └── styles/       # CSS (metallic gradients, CRT glow, keypad)
+│   └── __tests__/        # Vitest + Playwright tests
+├── tests/                # Python test suite (unit, integration, e2e)
+├── infra/                # Terraform IaC for AWS deployment
+├── alembic/              # Database migrations
+├── docs/                 # Project documentation
+└── docker-compose.yml    # Local development environment
 ```
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — System design, data model, technology decisions
+- [Architecture](docs/architecture.md) — System design, ADRs, data model, security threat model
+- [Frontend Architecture](docs/frontend-architecture.md) — React state machine, component hierarchy, animation system
 - [API Reference](docs/api.md) — Endpoint specifications and examples
-- [Deployment Guide](docs/deployment.md) — Docker, CI/CD, and cloud deployment
+- [Deployment Guide](docs/deployment.md) — Docker, CI/CD, and AWS cloud deployment
 - [User Guide](docs/user-guide.md) — How to use the ATM simulator
 
 ## Tech Stack
 
-- **Python 3.12** / **FastAPI** / **SQLAlchemy 2.0** / **Alembic**
-- **PostgreSQL 16** (production) / **SQLite** (testing)
-- **Textual** (terminal UI) / **ReportLab** (PDF generation)
-- **Docker** / **GitHub Actions** (CI/CD)
-- **pytest** / **Ruff** / **mypy**
+**Backend:** Python 3.12 / FastAPI / SQLAlchemy 2.0 / Alembic / PostgreSQL 16 / Celery + Redis
+
+**Frontend:** React 18 / TypeScript (strict) / Vite / Framer Motion / Axios
+
+**Testing:** pytest (582 tests) / Vitest (223 tests) / Playwright (36 tests)
+
+**Infrastructure:** Docker / GitHub Actions (11 CI jobs) / Terraform / AWS (ECS Fargate)
+
+**Security:** Bandit / pip-audit / npm audit / Trivy / Gitleaks / Dependabot
 
 ## License
 

@@ -1,3 +1,15 @@
+# ── Frontend build stage ───────────────────────────────────────────
+FROM node:20-alpine AS frontend-build
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --ignore-scripts
+
+COPY frontend/ .
+RUN npm run build
+
+# ── Python base stage ─────────────────────────────────────────────
 FROM python:3.12-slim AS base
 
 # Prevent Python from writing bytecode and enable unbuffered output
@@ -28,6 +40,9 @@ COPY src/ src/
 COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/
+
+# Copy built frontend assets from the Node.js stage
+COPY --from=frontend-build /frontend/dist/ frontend/dist/
 
 RUN pip install --no-cache-dir .
 

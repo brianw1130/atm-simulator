@@ -5,13 +5,19 @@
 ## Overview
 
 The ATM Simulator follows a layered architecture separating concerns across API routing,
-business logic, data access, and presentation.
+business logic, data access, and presentation. The system supports two presentation layers:
+a React web UI (skeuomorphic ATM kiosk) and a Textual terminal UI. Both communicate with
+the same FastAPI backend via REST.
+
+> **See also:** [Frontend Architecture](frontend-architecture.md) for the React state machine,
+> component hierarchy, and animation system.
 
 ```
 ┌─────────────────────────────────────────────────┐
 │  Presentation Layer                             │
 │  ┌──────────────┐  ┌────────────────────────┐  │
-│  │ Textual UI   │  │ FastAPI (REST API)      │  │
+│  │ React Web UI │  │ FastAPI (REST API)      │  │
+│  │ Textual TUI  │  │                        │  │
 │  └──────┬───────┘  └───────────┬────────────┘  │
 │─────────┼──────────────────────┼────────────────│
 │  Business Logic Layer (services/)               │
