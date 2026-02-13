@@ -1,0 +1,23 @@
+# Known architectural trade-offs for ATM Simulator infrastructure.
+# These findings are acknowledged and acceptable for the current deployment model.
+# TODO: Revisit when migrating to a private-subnet + NAT gateway architecture.
+
+# Fargate needs HTTPS egress to 0.0.0.0/0 for AWS service access (ECR, CloudWatch,
+# Secrets Manager). Proper fix: VPC endpoints for each service.
+AVD-AWS-0104
+
+# ECR image tag mutability — acceptable for dev/staging; production deployments
+# use explicit image digests in the ECS task definition.
+AVD-AWS-0031
+
+# Public subnet auto-assigns public IP — required because the architecture uses
+# public subnets without a NAT gateway (cost optimization).
+AVD-AWS-0164
+
+# RDS publicly accessible — required for public-subnet Fargate connectivity
+# without VPC endpoints. Security group restricts access to Fargate SG only.
+AVD-AWS-0180
+
+# S3 bucket uses AWS-managed encryption (SSE-S3) instead of customer-managed KMS key.
+# Acceptable for statement PDFs; no PII in stored files.
+AVD-AWS-0132
