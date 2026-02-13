@@ -14,7 +14,7 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 
 ## Agent Team Structure
 
-### Recommended Team Composition (7 Agents)
+### Recommended Team Composition (8 Agents)
 
 | Agent Role | Responsibility | Key Deliverables |
 |---|---|---|
@@ -22,6 +22,7 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 | **Software Architect** | System design, API contracts, data models, technology decisions | Architecture docs, ERD, API specs, ADRs |
 | **UX Designer** | User interface design, interaction flows, accessibility, error messaging | Wireframes, UI component specs, user flow diagrams |
 | **Software Engineer (Backend)** | Core business logic, API endpoints, database layer, transaction engine | Application source code, database migrations |
+| **Software Engineer (Frontend/UX)** | React web UI, component development, animations, state management | React components, CSS, Framer Motion animations, frontend tests |
 | **Software Engineer in Test (SDET)** | Test strategy, unit/integration/E2E tests, load testing, security testing | Test suite, coverage reports, test plans |
 | **Security Engineer** | Authentication, encryption, input validation, audit logging, threat modeling | Security review, threat model, hardening checklist |
 | **DevOps / Cloud Engineer** | Docker configuration, CI/CD pipeline, cloud deployment, monitoring | Dockerfile, docker-compose, deployment configs, IaC |
@@ -49,8 +50,12 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 | ORM | SQLAlchemy 2.0 + Alembic | Mature, well-documented, migration support |
 | PDF Generation | ReportLab | Industry standard for Python PDF generation |
 | Authentication | PIN-based with bcrypt hashing | Simulates real ATM auth; bcrypt for secure storage |
-| Frontend | Textual (terminal UI) + FastAPI HTML templates (web UI) | Dual interface: terminal for ATM simulation feel, web for accessibility |
-| Task Queue | (Phase 2) Celery + Redis | For async operations like statement generation |
+| Terminal UI | Textual | Terminal-based ATM simulation feel (Phase 1) |
+| Web UI | React 18 + Vite + TypeScript (strict) | Skeuomorphic ATM web interface (Phase 4/v2.0) |
+| Animations | Framer Motion 11 | Spring physics, AnimatePresence screen transitions, orchestrated sequences |
+| HTTP Client | Axios | Request/response interceptors for session headers, 401/503 handling |
+| State Management | React Context + useReducer | State machine pattern for linear ATM flow; no external deps needed |
+| Task Queue | Celery + Redis | Async operations (PDF generation, background tasks) |
 
 ### Infrastructure
 
@@ -58,9 +63,11 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 |---|---|---|
 | Containerization | Docker + docker-compose | Local development consistency |
 | CI/CD | GitHub Actions | Free for public repos, excellent Docker support |
-| Testing | pytest + pytest-cov + pytest-asyncio | Python testing standard |
-| Linting/Formatting | Ruff | Fast, replaces flake8 + black + isort |
-| Type Checking | mypy (strict mode) | Catch bugs early, especially important for financial logic |
+| Python Testing | pytest + pytest-cov + pytest-asyncio | Python testing standard |
+| Frontend Testing | Vitest + React Testing Library + Playwright | Unit/component tests (Vitest), browser E2E (Playwright) |
+| Python Linting | Ruff | Fast, replaces flake8 + black + isort |
+| Frontend Linting | ESLint (strict) + TypeScript strict mode | Zero-warning policy, strict type checking |
+| Python Type Checking | mypy (strict mode) | Catch bugs early, especially important for financial logic |
 | API Documentation | Auto-generated via FastAPI/OpenAPI | Zero-effort, always in sync |
 | Cloud Hosting (Phase 3) | AWS (ECS Fargate or App Runner) | Better fit than Vercel for a Python backend with database |
 
@@ -118,11 +125,14 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 - Change PIN (requires current PIN verification)
 - PIN complexity rules: no sequential digits (1234), no repeated digits (1111), no birthdate patterns
 
-### Administrative Features (Stretch Goals)
+### Administrative Features (Implemented in Phase 2)
 
 - Admin panel: create/deactivate accounts, adjust limits, view audit logs
-- ATM maintenance mode: temporarily disable operations
+- ATM maintenance mode: temporarily disable operations (Redis flag, 503 middleware)
 - Cash cassette simulation: track available denominations, go out-of-service when empty
+- Rate limiting (slowapi): 5 auth attempts per card per 15 minutes
+- Structured JSON logging with correlation IDs
+- Health check endpoints (`/health`, `/ready`)
 
 ---
 
@@ -195,9 +205,27 @@ atm-simulator/
 ├── Dockerfile
 ├── docker-compose.yml           # App + PostgreSQL + (Phase 2) Redis
 ├── .env.example                 # Environment variable template
+├── frontend/                    # React web UI (v2.0)
+│   ├── package.json
+│   ├── vite.config.ts           # Vite + Vitest config with coverage thresholds
+│   ├── tsconfig.json            # TypeScript strict mode
+│   ├── eslint.config.js
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx             # Entry point
+│       ├── App.tsx              # Screen router (state machine switch)
+│       ├── api/                 # Axios client + typed endpoint functions
+│       ├── state/               # React Context + useReducer state machine
+│       ├── hooks/               # Custom hooks (useATMContext, useIdleTimer)
+│       ├── components/
+│       │   ├── atm-housing/     # ATMFrame, ScreenBezel, SideButtons, Keypad, etc.
+│       │   ├── screens/         # 17 screen components
+│       │   └── shared/          # Reusable display components
+│       ├── styles/              # CSS (metallic gradients, CRT glow, keypad)
+│       └── __tests__/           # Vitest component + hook + API tests
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml               # Lint, type-check, test on every PR
+│       ├── ci.yml               # Python + Frontend lint, type-check, test on every PR
 │       └── deploy.yml           # (Phase 3) Deploy to AWS
 ├── alembic/                     # Database migrations
 │   ├── alembic.ini
@@ -313,6 +341,12 @@ atm-simulator/
 | `src/atm/api/` | Backend Engineer | Architect |
 | `src/atm/services/` | Backend Engineer | Security Engineer |
 | `src/atm/ui/` | UX Designer | Backend Engineer |
+| `frontend/src/components/` | Frontend Engineer | UX Designer |
+| `frontend/src/state/` | Frontend Engineer | Architect |
+| `frontend/src/api/` | Frontend Engineer | Backend Engineer |
+| `frontend/src/hooks/` | Frontend Engineer | — |
+| `frontend/src/styles/` | Frontend Engineer | UX Designer |
+| `frontend/src/__tests__/` | SDET | Frontend Engineer |
 | `src/atm/pdf/` | Backend Engineer | UX Designer |
 | `src/atm/utils/security.py` | Security Engineer | Backend Engineer |
 | `src/atm/db/` | Backend Engineer | Architect |
@@ -363,22 +397,79 @@ atm-simulator/
 4. DevOps: Finalize Docker setup, write docker-compose up instructions
 5. **Gate:** Full application working in Docker, all tests passing, security review complete
 
-### Phase 2: Hardening & Features
+### Phase 2: Hardening & Features (Complete)
 
-- Add Celery + Redis for async PDF generation
-- Admin panel (FastAPI web UI)
+- Celery + Redis for async PDF generation
+- Admin panel (FastAPI web UI with Jinja2 templates)
 - ATM cash cassette simulation
 - Rate limiting and request throttling
 - Structured logging (JSON) with correlation IDs
 - Health check endpoints (`/health`, `/ready`)
 
-### Phase 3: Cloud Deployment
+### Phase 3: Cloud Deployment (Complete)
 
-- Terraform or CDK for AWS infrastructure (VPC, ECS/App Runner, RDS PostgreSQL, S3 for statements)
+- Terraform IaC for AWS infrastructure (VPC, ECS Fargate, RDS PostgreSQL, S3 for statements)
 - CI/CD pipeline: GitHub Actions → build Docker image → push to ECR → deploy to ECS
 - Environment management (dev, staging, production)
 - Monitoring: CloudWatch metrics and alarms
 - Secrets management: AWS Secrets Manager for DB credentials, encryption keys
+
+### Phase 4: Web UI (v2.0)
+
+**Goal:** Add a skeuomorphic, interactive ATM web interface using React so users can experience the simulator in their browser. Desktop + tablet only (fixed aspect ratio, CSS scale-down).
+
+**Design decisions:**
+- **Framework:** React 18 + Vite + TypeScript (strict) — chosen for best animation ecosystem and instant transitions
+- **Animations:** Framer Motion — spring physics, AnimatePresence, staggered sequences
+- **State management:** useReducer state machine (17 screens, no React Router — ATMs don't have URL bars)
+- **Deployment:** Single Docker container (multi-stage build: Node.js builds React → FastAPI serves static files)
+- **API integration:** Axios with interceptors for X-Session-ID headers, 401 session expiry, 503 maintenance mode
+
+**Sprint 1 — Foundation (project setup, ATM housing, first 2 screens)**
+1. Initialize `frontend/` (Vite + React + TS + ESLint + Vitest)
+2. Build ATM housing components (ATMFrame, ScreenBezel, SideButtons, NumericKeypad, CardSlot, CashDispenser, ReceiptPrinter)
+3. Build state machine (ATMContext + atmReducer with 17 screens, 16 action types)
+4. Build Axios API client with session header + 401/503 interceptors
+5. Build WelcomeScreen + PinEntryScreen (with login API integration)
+6. Backend: CORS middleware (dev), StaticFiles mount, SPA catch-all, `/session/refresh` endpoint
+7. Add frontend CI jobs (lint, test, build) to GitHub Actions
+8. Write Vitest tests (100+ tests, 99%+ statement coverage)
+9. **Gate:** Card insert → PIN entry → auth success/failure works. ATM housing visually complete. All tests pass. CI green.
+
+**Sprint 2 — Core Transaction Screens (all 17 screens, API integration)**
+1. Build all remaining screens: MainMenu, BalanceInquiry, Withdrawal (3 screens), Deposit (2), Transfer (3), Statement, PinChange, SessionTimeout, Error, Maintenance
+2. Build `useIdleTimer` hook for session timeout with 30s warning overlay
+3. Backend: `GET /statements/download/{filename}` endpoint
+4. Write typed API endpoint functions for all operations
+5. Vitest tests for all screens + MSW API integration tests (65-80 new tests)
+6. **Gate:** All 17 screens functional. Every API endpoint called correctly. Session timeout works. 90+ frontend tests pass.
+
+**Sprint 3 — Animations + Polish + Browser Testing**
+1. Card insertion, cash dispensing, receipt printing animations (Framer Motion)
+2. Screen transition animations (AnimatePresence)
+3. Keypad + side button press feedback
+4. Loading spinner overlay, session timeout warning overlay
+5. ATM typography (monospace/LCD font), CRT glow effect, responsive scaling
+6. Playwright browser E2E tests (18-22 tests)
+7. **Gate:** All animations smooth (60fps). Playwright E2E passes. Feels like a real ATM.
+
+**Sprint 4 — Docker, Documentation, Final Polish**
+1. Update Dockerfile with Node.js build stage (multi-stage)
+2. Update CLAUDE.md, README.md, docs/architecture.md
+3. Write docs/frontend-architecture.md
+4. Full smoke test: `docker-compose up` → browser → all flows
+5. Stability run: test suite 5x for flakiness report
+6. **Gate:** All CI jobs green. `docker-compose up` serves complete ATM UI. Documentation complete.
+
+### Sprint Checkpoint Protocol
+
+At the end of every sprint, after all tests pass and code is committed/pushed:
+
+1. **Git tag** — `git tag v2.0-sprint{N}` + `git push --tags` (clean restore point)
+2. **CI verification** — confirm all CI jobs are green on the tagged commit
+3. **Context compact** — start a fresh conversation for the next sprint with a summary of completed work and next sprint scope
+
+This ensures we have a rollback point at every sprint gate and avoid context limit issues.
 
 ---
 
@@ -395,9 +486,21 @@ atm-simulator/
 - **Single Responsibility Principle.** Each function does one thing. If a function exceeds 40 lines, it should be decomposed.
 - **Explicit error handling.** No bare `except:` clauses. All exceptions must be specific, logged, and result in meaningful user-facing error messages.
 
+### Frontend Code Quality
+
+- **TypeScript strict mode** (`strict: true`, `noUnusedLocals`, `noUncheckedIndexedAccess`). Zero errors required.
+- **ESLint** with `--max-warnings=0`. No warnings allowed.
+- **React-specific rules:** `eslint-plugin-react-hooks` (recommended) + `eslint-plugin-react-refresh`.
+- **Component architecture:** Presentational components receive data via props. State machine logic lives exclusively in `atmReducer.ts`. Screens dispatch actions; they do not call APIs directly except during login flow.
+- **CSS approach:** Plain CSS with custom properties (CSS variables). Metallic gradients and CRT glow effects via CSS. No CSS-in-JS libraries.
+- **Animation rules:** Only `transform` and `opacity` properties (GPU-composited). `prefers-reduced-motion` media query disables all animations. No layout-triggering animations.
+- **Accessibility:** All interactive elements have `aria-label`. Keyboard navigation via physical key mapping (0-9, Enter, Escape, Backspace).
+
+---
+
 ### Testing Strategy
 
-#### Coverage Targets
+#### Python Coverage Targets
 
 | Code Category | Coverage Target | Rationale |
 |---|---|---|
@@ -411,6 +514,21 @@ atm-simulator/
 | `ui/` (Textual screens) | **90%+** | UI wiring and event handlers tested; some visual rendering paths are framework-internal. |
 | `db/`, `config.py`, `main.py` | **90%+** | Infrastructure glue code. Tested through integration tests; trivial boilerplate may be excluded with documented justification. |
 | **Overall project** | **95%+** | Measured via `pytest-cov`. Any file below 90% requires a written justification in the PR description. |
+
+#### Frontend Coverage Targets
+
+| Code Category | Coverage Target | Rationale |
+|---|---|---|
+| `state/` (reducer, types) | **100%** | State machine is the backbone — every branch must be verified. |
+| `api/` (client, endpoints) | **95%+** | Network layer; interceptors are critical for session management. |
+| `hooks/` | **100%** | Shared logic consumed by multiple components. |
+| `components/screens/` | **90%+ statements** | User-facing screens; some animation internals hard to unit test. |
+| `components/atm-housing/` | **90%+** | Structural components; visual details covered by E2E. |
+| **Overall frontend** | **90%+ statements, 85%+ branches** | Measured via `@vitest/coverage-v8`. |
+
+> **Note on v8 function coverage:** v8 counts each `useCallback`, arrow function, and inline handler inside React components as a separate function entry, inflating the denominator. **Lines and statements are the primary quality gate** for React code. The function threshold is set to 65% to account for this v8 behavior.
+
+Coverage thresholds are enforced in `vite.config.ts` and fail the `npm run test:coverage` command if not met. The `frontend-test` CI job enforces these thresholds on every PR.
 
 > **Exclusion policy:** Lines excluded from coverage (via `# pragma: no cover`) must include an inline comment explaining why. Additionally, the SDET must log every exclusion in `tests/COVERAGE_EXCLUSIONS.md` with the file path, line number(s), reason, and date added. This file is reviewed by the Team Lead before any sprint gate. Acceptable exclusion reasons: defensive error handling for conditions that cannot be triggered in tests (e.g., database connection failures during migration), abstract base class methods that exist only for interface contracts, or platform-specific branches that cannot execute in the test environment. **"It's hard to test" is never an acceptable reason.** If something is hard to test, that's a design problem — refactor the code to make it testable.
 
@@ -582,6 +700,39 @@ tests/
     └── test_error_journeys.py      # E2E-ERR-01 through E2E-ERR-04
 ```
 
+#### Frontend Test Execution
+
+- **Both test suites must pass independently before any commit/push:**
+  - `pytest --cov=src/atm` — Python backend (562+ tests)
+  - `npx vitest run --coverage` — React frontend (109+ tests, growing)
+- **CI runs both suites in parallel** — 5 Python jobs + 3 frontend jobs (8 total)
+- **Failing tests in either suite block merge.** No exceptions.
+- **Frontend tests use jsdom** for component/hook tests and **Playwright** for browser E2E tests.
+- **MSW (Mock Service Worker)** mocks API responses in frontend integration tests — no dependency on a running backend.
+
+#### Frontend Test File Organization
+
+```
+frontend/src/__tests__/
+├── setup.ts                       # @testing-library/jest-dom setup
+├── state/
+│   └── atmReducer.test.ts         # All 16 action types + edge cases
+├── api/
+│   ├── client.test.ts             # Axios interceptors (session header, 401, 503)
+│   └── endpoints.test.ts          # All API endpoint functions (mocked client)
+├── hooks/
+│   └── useATMContext.test.tsx      # Context hook + error boundary
+├── components/
+│   ├── ATMHousing.test.tsx         # ATMFrame, ScreenBezel, CardSlot, CashDispenser, ReceiptPrinter
+│   ├── SideButtons.test.tsx        # Side button rendering + click handlers
+│   ├── NumericKeypad.test.tsx      # All buttons + physical keyboard mapping
+│   ├── WelcomeScreen.test.tsx      # Card number input + validation
+│   ├── PinEntryScreen.test.tsx     # PIN entry + keypad handlers + API calls
+│   ├── screens.test.tsx            # ErrorScreen, SessionTimeout, Maintenance, MainMenu
+│   └── App.test.tsx                # Full app render + screen transitions + side buttons
+└── e2e/                            # (Sprint 3) Playwright browser tests
+```
+
 ### Security
 
 - PINs stored as bcrypt hashes with application-level pepper, never plaintext, **never logged — not even masked**
@@ -674,16 +825,29 @@ DAILY_TRANSFER_LIMIT=250000   # in cents
 STATEMENT_OUTPUT_DIR=/app/statements
 LOG_LEVEL=INFO
 ENVIRONMENT=development
+FRONTEND_ENABLED=true           # Set to false to disable static file serving
 ```
 
 ---
 
 ## References & Useful Links
 
+### Backend
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [SQLAlchemy 2.0 Tutorial](https://docs.sqlalchemy.org/en/20/tutorial/)
 - [Textual Documentation](https://textual.textualize.io/)
 - [ReportLab User Guide](https://docs.reportlab.com/reportlab/userguide/)
+
+### Frontend (v2.0)
+- [React Documentation](https://react.dev/)
+- [Vite Documentation](https://vite.dev/)
+- [Framer Motion Documentation](https://motion.dev/)
+- [Vitest Documentation](https://vitest.dev/)
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Playwright Documentation](https://playwright.dev/)
+
+### Infrastructure
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Terraform Documentation](https://developer.hashicorp.com/terraform)
 - [Claude Code Agent Teams](https://code.claude.com/docs/en/agent-teams)
 - [Conventional Commits](https://www.conventionalcommits.org/)

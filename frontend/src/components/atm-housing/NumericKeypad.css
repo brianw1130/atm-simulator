@@ -1,0 +1,102 @@
+/* Numeric keypad */
+.keypad {
+  display: flex;
+  gap: 8px;
+  padding: 4px 12px;
+}
+
+.keypad__number-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.keypad__function-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+/* Base key style */
+.key {
+  width: 48px;
+  height: 38px;
+  border: none;
+  border-radius: 6px;
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  color: var(--key-text);
+  background: linear-gradient(180deg, var(--key-bg) 0%, #d0d0d0 100%);
+  box-shadow:
+    0 3px 0 var(--key-shadow),
+    0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 50ms, box-shadow 50ms;
+  user-select: none;
+}
+
+.key:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 var(--key-shadow),
+    0 2px 3px rgba(0, 0, 0, 0.2);
+}
+
+.key:hover {
+  background: linear-gradient(180deg, var(--key-bg-hover) 0%, #e0e0e0 100%);
+}
+
+/* Number keys */
+.key--number {
+  color: #222;
+}
+
+/* Zero key spans 2 columns */
+.key--zero {
+  grid-column: 1 / 4;
+  width: 100%;
+}
+
+/* Function keys */
+.key--cancel {
+  background: linear-gradient(180deg, #ee5555 0%, var(--key-cancel) 100%);
+  color: white;
+  font-size: 11px;
+  box-shadow:
+    0 3px 0 #993333,
+    0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.key--cancel:hover {
+  background: linear-gradient(180deg, #ff6666 0%, #dd4444 100%);
+}
+
+.key--clear {
+  background: linear-gradient(180deg, #eebb44 0%, var(--key-clear) 100%);
+  color: white;
+  font-size: 11px;
+  box-shadow:
+    0 3px 0 #997733,
+    0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.key--clear:hover {
+  background: linear-gradient(180deg, #ffcc55 0%, #ddaa33 100%);
+}
+
+.key--enter {
+  background: linear-gradient(180deg, #44bb44 0%, var(--key-enter) 100%);
+  color: white;
+  font-size: 11px;
+  flex: 1;
+  box-shadow:
+    0 3px 0 #226622,
+    0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.key--enter:hover {
+  background: linear-gradient(180deg, #55cc55 0%, #44aa44 100%);
+}

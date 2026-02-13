@@ -1,0 +1,20 @@
+/* Receipt printer slot */
+.receipt-printer {
+  width: 120px;
+  height: 8px;
+  background: linear-gradient(180deg, #111 0%, #1a1a1a 100%);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.receipt-printer__label {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+  margin-top: 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}

@@ -1,9 +1,13 @@
 """FastAPI application factory and startup configuration."""
 
+import pathlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -46,6 +50,16 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
+    # CORS — allow Vite dev server in development mode.
+    if settings.is_development:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["http://localhost:5173"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     # Middleware order matters: outermost first.
     # CorrelationId runs first (outermost), then RequestLogging, then Maintenance.
     app.add_middleware(MaintenanceMiddleware)
@@ -53,6 +67,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware)
 
     _register_routers(app)
+    _mount_frontend(app)
 
     return app
 
@@ -78,6 +93,43 @@ def _register_routers(app: FastAPI) -> None:
     from src.atm.api.admin import router as admin_router
 
     app.include_router(admin_router, prefix="/admin", tags=["Admin"])
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Mount the React SPA static files and catch-all route.
+
+    In production, the React build output lives at ``frontend/dist/``.
+    If the directory does not exist (e.g. in tests or when ``frontend_enabled``
+    is ``False``), this function is a no-op.
+
+    Args:
+        app: The FastAPI application instance.
+    """
+    if not settings.frontend_enabled:
+        return
+
+    frontend_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if not frontend_dir.exists():
+        return
+
+    assets_dir = frontend_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="static-assets")
+
+    index_html = frontend_dir / "index.html"
+
+    @app.get("/", response_class=FileResponse, include_in_schema=False)
+    async def serve_spa_root() -> FileResponse:
+        """Serve the React SPA index page."""
+        return FileResponse(str(index_html))
+
+    @app.get("/{path:path}", response_class=FileResponse, include_in_schema=False)
+    async def serve_spa_fallback(path: str) -> FileResponse:
+        """Serve static files or fall back to index.html for client-side routing."""
+        file_path = frontend_dir / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(index_html))
 
 
 app = create_app()

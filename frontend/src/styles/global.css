@@ -1,0 +1,81 @@
+/* ATM Simulator — Global Styles */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ATM housing colors */
+  --atm-body: #3a3d42;
+  --atm-body-light: #52565c;
+  --atm-body-dark: #2a2c30;
+  --atm-bezel: #1a1c1e;
+
+  /* Screen colors */
+  --screen-bg: #001a0a;
+  --screen-glow: rgba(0, 180, 100, 0.12);
+  --screen-text: #33ff88;
+  --screen-text-dim: #1a9955;
+  --screen-text-bright: #66ffaa;
+  --screen-heading: #ffffff;
+  --screen-error: #ff4444;
+  --screen-highlight: #44aaff;
+
+  /* Keypad colors */
+  --key-bg: #e8e8e8;
+  --key-bg-hover: #f0f0f0;
+  --key-shadow: #888;
+  --key-text: #222;
+  --key-cancel: #cc3333;
+  --key-clear: #cc9933;
+  --key-enter: #339933;
+
+  /* Side button colors */
+  --side-btn-bg: #4a4d52;
+  --side-btn-hover: #5a5d62;
+  --side-btn-active: #3a3d42;
+
+  /* Sizing */
+  --atm-width: 520px;
+  --atm-screen-width: 380px;
+  --atm-screen-height: 280px;
+
+  /* Animations */
+  --atm-animations: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --atm-animations: 0;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    "Courier New",
+    Courier,
+    monospace;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--screen-text);
+}
+
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}

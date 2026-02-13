@@ -15,6 +15,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from starlette.requests import Request
 
 from src.atm.api import CurrentSession, DbSession
+from src.atm.config import settings
 from src.atm.middleware.rate_limit import get_card_number_or_ip, limiter
 from src.atm.schemas.auth import (
     LoginRequest,
@@ -126,3 +127,25 @@ async def pin_change(
             detail=str(exc),
         ) from exc
     return PinChangeResponse(**result)
+
+
+@router.post("/session/refresh")
+async def refresh_session(
+    session_info: CurrentSession,
+) -> dict[str, str]:
+    """Refresh the current session's inactivity timer.
+
+    The ``CurrentSession`` dependency already calls ``validate_session()``
+    which resets the Redis TTL.  This endpoint simply provides a lightweight
+    way for the frontend to keep the session alive on user activity.
+
+    Args:
+        session_info: Validated session data from dependency.
+
+    Returns:
+        Confirmation message with the configured timeout.
+    """
+    return {
+        "message": "Session refreshed",
+        "timeout_seconds": str(settings.session_timeout_seconds),
+    }

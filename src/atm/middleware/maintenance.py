@@ -15,7 +15,16 @@ MAINTENANCE_KEY = "atm:maintenance_mode"
 MAINTENANCE_REASON_KEY = "atm:maintenance_reason"
 
 # Paths that are always allowed, even during maintenance.
-_ALLOWED_PREFIXES = ("/health", "/ready", "/admin", "/docs", "/redoc", "/openapi.json")
+_ALLOWED_PREFIXES = (
+    "/health",
+    "/ready",
+    "/admin",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/assets",
+    "/favicon.ico",
+)
 
 
 class MaintenanceMiddleware:

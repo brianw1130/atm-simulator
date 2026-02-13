@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Frontend
+    frontend_enabled: bool = True
+
     # Environment
     environment: str = "development"
 

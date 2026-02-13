@@ -34,6 +34,11 @@ htmlcov/
 statements/
 test-statements/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
 # Terraform
 .terraform/
 *.tfstate

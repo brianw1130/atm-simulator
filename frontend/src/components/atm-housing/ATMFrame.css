@@ -1,0 +1,79 @@
+/* ATM outer metal casing */
+.atm-frame {
+  width: var(--atm-width);
+  background: linear-gradient(
+    160deg,
+    var(--atm-body-light) 0%,
+    var(--atm-body) 30%,
+    var(--atm-body-dark) 100%
+  );
+  border-radius: 18px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 2px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  transform-origin: top center;
+}
+
+/* Scale down on smaller viewports */
+@media (max-height: 900px) {
+  .atm-frame {
+    transform: scale(0.85);
+  }
+}
+
+@media (max-height: 750px) {
+  .atm-frame {
+    transform: scale(0.7);
+  }
+}
+
+/* Bank logo area */
+.atm-header {
+  width: 100%;
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
+.atm-header__logo {
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #d0d0d0;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3),
+    0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Screen + side buttons area */
+.atm-screen-section {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+
+/* Card / receipt / cash area */
+.atm-slots-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 12px;
+}
+
+/* Bottom panel */
+.atm-bottom-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}

@@ -1,0 +1,121 @@
+/* Screen content layout and typography */
+.screen-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+  color: var(--screen-text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+.screen-content__header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.screen-content__header h2 {
+  font-size: 18px;
+  color: var(--screen-heading);
+  margin-bottom: 4px;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.screen-content__header p {
+  font-size: 13px;
+  color: var(--screen-text-dim);
+}
+
+.screen-content__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.screen-content__footer {
+  text-align: center;
+  padding-top: 8px;
+}
+
+/* Screen elements */
+.screen-label {
+  font-size: 12px;
+  color: var(--screen-text-dim);
+  margin-bottom: 4px;
+  display: block;
+  text-align: center;
+}
+
+.screen-input {
+  background: rgba(0, 30, 15, 0.6);
+  border: 1px solid var(--screen-text-dim);
+  border-radius: 3px;
+  color: var(--screen-text-bright);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 16px;
+  padding: 8px 12px;
+  text-align: center;
+  width: 240px;
+  outline: none;
+}
+
+.screen-input:focus {
+  border-color: var(--screen-text);
+  box-shadow: 0 0 6px var(--screen-glow);
+}
+
+.screen-input::placeholder {
+  color: rgba(51, 153, 85, 0.4);
+}
+
+.screen-btn {
+  background: transparent;
+  border: 1px solid var(--screen-text);
+  color: var(--screen-text);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.screen-btn:hover {
+  background: rgba(51, 255, 136, 0.1);
+}
+
+.screen-error {
+  color: var(--screen-error);
+  font-size: 13px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.screen-text-dim {
+  color: var(--screen-text-dim);
+}
+
+/* PIN dot display */
+.pin-display {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--screen-text-dim);
+  transition: background 100ms;
+}
+
+.pin-dot--filled {
+  background: var(--screen-text);
+  border-color: var(--screen-text);
+  box-shadow: 0 0 6px var(--screen-text);
+}
