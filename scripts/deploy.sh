@@ -81,8 +81,8 @@ cmd_push() {
   registry="${ecr_url%%/*}"
   local tag="${1:-$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD)}"
 
-  bold "Building production Docker image..."
-  docker build --target production -t "${ecr_url}:${tag}" -t "${ecr_url}:latest" "${PROJECT_ROOT}"
+  bold "Building production Docker image (linux/amd64)..."
+  docker build --platform linux/amd64 --target production -t "${ecr_url}:${tag}" -t "${ecr_url}:latest" "${PROJECT_ROOT}"
 
   bold "Logging in to ECR..."
   aws ecr get-login-password --region "${region}" | \

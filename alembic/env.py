@@ -16,8 +16,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the database URL from application settings
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+# Set the database URL from application settings.
+# Use the async URL (asyncpg driver) since our env.py runs migrations via
+# async_engine_from_config.  The sync URL (psycopg2) is not available in the
+# production Docker image.
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
 

@@ -60,7 +60,7 @@ class AuditLog(Base):
         ForeignKey("accounts.id"), nullable=True, index=True
     )
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
-    session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True

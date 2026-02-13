@@ -165,7 +165,10 @@ resource "aws_ecs_task_definition" "migration" {
         { name = "ENVIRONMENT", value = "production" },
       ]
       secrets = [
+        { name = "DATABASE_URL", valueFrom = var.database_url_secret_arn },
         { name = "DATABASE_URL_SYNC", valueFrom = var.database_url_sync_secret_arn },
+        { name = "SECRET_KEY", valueFrom = var.secret_key_secret_arn },
+        { name = "PIN_PEPPER", valueFrom = var.pin_pepper_secret_arn },
       ]
       logConfiguration = {
         logDriver = "awslogs"
