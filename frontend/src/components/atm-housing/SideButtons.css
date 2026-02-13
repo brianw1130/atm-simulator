@@ -16,7 +16,7 @@
 }
 
 .side-button {
-  width: 80px;
+  width: 36px;
   height: 28px;
   background: linear-gradient(
     180deg,
@@ -31,9 +31,6 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: transform 50ms, box-shadow 50ms;
   position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
 }
 
 .side-button:hover:not(:disabled) {
@@ -67,28 +64,6 @@
 .side-button:disabled {
   opacity: 0.3;
   cursor: default;
-}
-
-/* Label text inside button */
-.side-button__label {
-  font-family: "Courier New", Courier, monospace;
-  font-size: 9px;
-  font-weight: bold;
-  color: #c0c0c0;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1;
-}
-
-.side-button--left {
-  justify-content: flex-end;
-}
-
-.side-button--right {
-  justify-content: flex-start;
 }
 
 /* Connector line from button to screen edge */

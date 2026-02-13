@@ -56,3 +56,46 @@
     animation: none;
   }
 }
+
+/* On-screen labels aligned with physical side buttons */
+.screen-labels {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 8px 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.screen-labels--left {
+  left: 6px;
+}
+
+.screen-labels--right {
+  right: 6px;
+}
+
+.screen-label-item {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 10px;
+  color: var(--screen-text-dim);
+  white-space: nowrap;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.screen-labels--left .screen-label-item {
+  justify-content: flex-start;
+}
+
+.screen-labels--right .screen-label-item {
+  justify-content: flex-end;
+}
+
+.screen-label-item--empty {
+  visibility: hidden;
+}

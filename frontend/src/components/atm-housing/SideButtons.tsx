@@ -38,9 +38,7 @@ export function SideButtons({ side, buttons }: SideButtonsProps) {
           data-testid={
             btn ? `side-btn-${side}-${btn.label.toLowerCase().replace(/[\s$]/g, "-")}` : undefined
           }
-        >
-          {btn?.label && <span className="side-button__label">{btn.label}</span>}
-        </button>
+        />
       ))}
     </div>
   );

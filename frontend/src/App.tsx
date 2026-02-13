@@ -392,7 +392,10 @@ export default function App() {
     <ATMFrame>
       <div className="atm-screen-section">
         <SideButtons side="left" buttons={buildSideButtons("left")} />
-        <ScreenBezel>
+        <ScreenBezel
+          leftLabels={buildSideButtons("left").map((b) => b?.label ?? null)}
+          rightLabels={buildSideButtons("right").map((b) => b?.label ?? null)}
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={state.currentScreen}
