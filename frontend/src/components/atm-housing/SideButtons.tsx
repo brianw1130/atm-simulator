@@ -34,10 +34,13 @@ export function SideButtons({ side, buttons }: SideButtonsProps) {
           onClick={btn?.onClick}
           disabled={!btn || btn.disabled}
           aria-label={btn?.label ?? `Empty ${side} button ${String(i + 1)}`}
+          title={btn?.label}
           data-testid={
             btn ? `side-btn-${side}-${btn.label.toLowerCase().replace(/[\s$]/g, "-")}` : undefined
           }
-        />
+        >
+          {btn?.label && <span className="side-button__label">{btn.label}</span>}
+        </button>
       ))}
     </div>
   );
