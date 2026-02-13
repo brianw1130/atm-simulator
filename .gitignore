@@ -38,6 +38,10 @@ test-statements/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+node_modules/
+
+# Sample screenshots (not version controlled)
+SampleATM*.png
 
 # Terraform
 .terraform/

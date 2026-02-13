@@ -17,7 +17,7 @@ git clone https://github.com/brianw/atm-simulator.git
 cd atm-simulator
 
 # Start all services (app, PostgreSQL, Redis)
-docker-compose up -d
+docker compose up -d
 
 # The API is available at http://localhost:8000
 # API docs at http://localhost:8000/docs (development mode only)
@@ -203,7 +203,7 @@ curl -X POST http://localhost:8000/api/v1/transactions/deposit \
 curl -X POST http://localhost:8000/api/v1/transactions/transfer \
   -H "Content-Type: application/json" \
   -H "X-Session-ID: <your-session-id>" \
-  -d '{"amount_cents": 25000, "to_account_number": "1000-0001-0002"}'
+  -d '{"amount_cents": 25000, "destination_account_number": "1000-0001-0002"}'
 ```
 
 ### Account Statement

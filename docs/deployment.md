@@ -141,6 +141,7 @@ All configuration is managed through environment variables. Copy `.env.example` 
 | `STATEMENT_OUTPUT_DIR` | `/app/statements` | Directory where generated PDF statements are saved |
 | `LOG_LEVEL` | `INFO` | Python log level: DEBUG, INFO, WARNING, ERROR, CRITICAL |
 | `ENVIRONMENT` | `development` | Application environment: `development`, `testing`, or `production`. Controls debug features, docs endpoints, and database echo. |
+| `FRONTEND_ENABLED` | `true` | Set to `false` to disable React web UI serving (API-only mode). |
 
 ## Database Setup
 
@@ -172,6 +173,42 @@ docker compose exec app python -m scripts.seed_db
 
 This creates five accounts across three customers (Alice, Bob, Charlie) with predefined balances and PINs. See `CLAUDE.md` for the full seed data table.
 
+## Docker Multi-Stage Build
+
+The `Dockerfile` uses a multi-stage build to produce an optimized production image that serves both the FastAPI backend and the React web UI from a single container.
+
+### Build Stages
+
+| Stage | Base Image | Purpose |
+|---|---|---|
+| `frontend-build` | `node:20-alpine` | Installs npm dependencies and runs `npm run build` to compile the React app into static assets (`frontend/dist/`). |
+| `base` | `python:3.12-slim` | Installs system dependencies (libpq, gcc, curl). Shared by all Python stages. |
+| `dependencies` | `base` | Installs Python dev dependencies. Used by the development stage. |
+| `production` | `base` | Installs production Python packages, copies source code and compiled frontend assets. Runs as non-root `appuser`. |
+| `development` | `dependencies` | Full source mount with hot reload (`--reload`). Used by `docker compose up`. |
+
+### How Frontend Serving Works
+
+In production, FastAPI serves the React SPA:
+1. The `frontend-build` stage compiles React to `frontend/dist/` (HTML + JS + CSS).
+2. The `production` stage copies `frontend/dist/` into the image.
+3. `src/atm/main.py` mounts `/assets` as static files and serves `index.html` for all non-API routes.
+4. The `FRONTEND_ENABLED` env var (default `true`) controls whether static file serving is active.
+
+In development, a separate Vite dev server runs on port 5173 with hot module replacement, proxying API calls to the backend on port 8000.
+
+### Building for Production
+
+```bash
+# Build targeting the production stage
+docker build --target production -t atm-simulator:latest .
+
+# Run the production container
+docker run -p 8000:8000 --env-file .env atm-simulator:latest
+```
+
+The React UI will be accessible at `http://localhost:8000`.
+
 ## CI/CD Pipeline
 
 The project uses GitHub Actions for continuous integration and deployment.
@@ -182,9 +219,17 @@ Runs on every push to `main` and on every pull request targeting `main`.
 
 | Job | What It Does |
 |---|---|
-| **lint** | Installs dependencies, then runs `ruff check .` (linting) and `ruff format --check .` (formatting verification). Catches style violations and import ordering issues. |
-| **type-check** | Runs `mypy --strict src/` to enforce type annotations across the entire source tree. All public functions must have complete type hints. |
-| **test** | Runs `pytest` with coverage against a SQLite test database (no PostgreSQL required in CI). Generates both terminal and XML coverage reports. The XML report is uploaded as a build artifact. |
+| **lint** | Runs `ruff check .` (linting) and `ruff format --check .` (formatting). |
+| **type-check** | Runs `mypy --strict src/` to enforce type annotations. |
+| **test** | Runs `pytest` with coverage against a SQLite test database. Uploads XML coverage report as artifact. |
+| **security** | Runs `pip-audit` (dependency CVEs) and `bandit -r src/` (Python SAST). |
+| **security-frontend** | Runs `npm audit --audit-level=high` on frontend dependencies. |
+| **security-docker** | Runs Trivy filesystem scan (dependency CVEs) and IaC scan (Terraform misconfigs). |
+| **security-secrets** | Runs Gitleaks against full git history to detect leaked credentials. |
+| **frontend-lint** | Runs ESLint (`--max-warnings=0`) and TypeScript type check (`tsc --noEmit`). |
+| **frontend-test** | Runs Vitest with coverage thresholds. Uploads coverage report as artifact. |
+| **frontend-build** | Runs `npm run build` and verifies `dist/index.html` exists. |
+| **terraform** | Runs `terraform fmt -check`, `terraform init`, and `terraform validate`. |
 
 A failing job blocks pull request merges.
 
