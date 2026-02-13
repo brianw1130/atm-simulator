@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { deposit } from "../../api/endpoints";
 import axios from "axios";
@@ -103,12 +103,14 @@ export function DepositScreen() {
     }
   }, [phase, amountStr, isCheck, checkNumberStr, submitDeposit]);
 
-  DepositScreen.keypadHandlers = {
-    onDigit: handleDigit,
-    onClear: handleClear,
-    onCancel: handleCancel,
-    onEnter: handleEnter,
-  };
+  useEffect(() => {
+    DepositScreen.keypadHandlers = {
+      onDigit: handleDigit,
+      onClear: handleClear,
+      onCancel: handleCancel,
+      onEnter: handleEnter,
+    };
+  }, [handleDigit, handleClear, handleCancel, handleEnter]);
 
   const selectedAccount = state.accounts.find(
     (a) => a.id === state.selectedAccountId,

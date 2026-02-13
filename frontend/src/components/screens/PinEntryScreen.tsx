@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { login, listAccounts } from "../../api/endpoints";
 import axios from "axios";
@@ -72,15 +72,15 @@ export function PinEntryScreen() {
     }
   }, [pin, state.cardNumber, dispatch]);
 
-  // Expose keypad handlers for the parent to wire to NumericKeypad
-  // We use a global event approach via window
-  // These are called by App.tsx which passes them to NumericKeypad
-  PinEntryScreen.keypadHandlers = {
-    onDigit: handleDigit,
-    onClear: handleClear,
-    onCancel: handleCancel,
-    onEnter: handleEnter,
-  };
+  // Expose keypad handlers for App.tsx to wire to NumericKeypad
+  useEffect(() => {
+    PinEntryScreen.keypadHandlers = {
+      onDigit: handleDigit,
+      onClear: handleClear,
+      onCancel: handleCancel,
+      onEnter: handleEnter,
+    };
+  }, [handleDigit, handleClear, handleCancel, handleEnter]);
 
   const maskedCard = state.cardNumber
     ? `****${state.cardNumber.slice(-4)}`

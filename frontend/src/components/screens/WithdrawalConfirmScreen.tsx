@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { withdraw } from "../../api/endpoints";
 import axios from "axios";
@@ -36,7 +36,9 @@ export function WithdrawalConfirmScreen() {
     }
   }, [state.pendingTransaction, dispatch]);
 
-  WithdrawalConfirmScreen.handleConfirm = handleConfirm;
+  useEffect(() => {
+    WithdrawalConfirmScreen.handleConfirm = handleConfirm;
+  }, [handleConfirm]);
 
   const selectedAccount = state.accounts.find(
     (a) => a.id === state.selectedAccountId,

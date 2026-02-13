@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 
 const MAX_ACCOUNT_DIGITS = 14;
@@ -21,8 +21,6 @@ export function TransferScreen() {
     },
     [],
   );
-
-  TransferScreen.setOwnAccountDestination = setOwnAccountDestination;
 
   const handleDigit = useCallback(
     (digit: string) => {
@@ -88,12 +86,15 @@ export function TransferScreen() {
     }
   }, [phase, destinationStr, amountStr, dispatch]);
 
-  TransferScreen.keypadHandlers = {
-    onDigit: handleDigit,
-    onClear: handleClear,
-    onCancel: handleCancel,
-    onEnter: handleEnter,
-  };
+  useEffect(() => {
+    TransferScreen.keypadHandlers = {
+      onDigit: handleDigit,
+      onClear: handleClear,
+      onCancel: handleCancel,
+      onEnter: handleEnter,
+    };
+    TransferScreen.setOwnAccountDestination = setOwnAccountDestination;
+  }, [handleDigit, handleClear, handleCancel, handleEnter, setOwnAccountDestination]);
 
   const selectedAccount = state.accounts.find(
     (a) => a.id === state.selectedAccountId,

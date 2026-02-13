@@ -40,7 +40,7 @@ export function useIdleTimer(): IdleTimerResult {
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastResetRef = useRef(0);
-  const lastServerRefreshRef = useRef(Date.now());
+  const lastServerRefreshRef = useRef(0);
 
   const [showWarning, setShowWarning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -96,7 +96,6 @@ export function useIdleTimer(): IdleTimerResult {
       !ACTIVE_SCREENS.includes(state.currentScreen)
     ) {
       clearAllTimers();
-      setShowWarning(false);
       return;
     }
 
@@ -104,9 +103,11 @@ export function useIdleTimer(): IdleTimerResult {
       window.addEventListener(event, resetTimer);
     }
 
-    resetTimer();
+    // Defer initial reset to avoid synchronous setState in effect body.
+    const timerId = setTimeout(resetTimer, 0);
 
     return () => {
+      clearTimeout(timerId);
       for (const event of ACTIVITY_EVENTS) {
         window.removeEventListener(event, resetTimer);
       }
@@ -114,5 +115,8 @@ export function useIdleTimer(): IdleTimerResult {
     };
   }, [state.sessionId, state.currentScreen, resetTimer, clearAllTimers]);
 
-  return { showWarning, secondsLeft };
+  // Derive effective warning: only meaningful on active authenticated screens
+  const isActiveScreen =
+    !!state.sessionId && ACTIVE_SCREENS.includes(state.currentScreen);
+  return { showWarning: showWarning && isActiveScreen, secondsLeft };
 }

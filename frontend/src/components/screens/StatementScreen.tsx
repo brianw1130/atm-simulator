@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { generateStatement } from "../../api/endpoints";
 import type { StatementResponse } from "../../api/types";
@@ -31,7 +31,9 @@ export function StatementScreen() {
     [dispatch],
   );
 
-  StatementScreen.handleGenerate = handleGenerate;
+  useEffect(() => {
+    StatementScreen.handleGenerate = handleGenerate;
+  }, [handleGenerate]);
 
   const handleDownload = useCallback(() => {
     if (!result) return;

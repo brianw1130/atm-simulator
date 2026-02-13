@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 
 const MAX_AMOUNT_DIGITS = 5;
@@ -53,14 +53,15 @@ export function WithdrawalScreen() {
     stageWithdrawal(amount * 100);
   }, [amountStr, stageWithdrawal]);
 
-  WithdrawalScreen.keypadHandlers = {
-    onDigit: handleDigit,
-    onClear: handleClear,
-    onCancel: handleCancel,
-    onEnter: handleEnter,
-  };
-
-  WithdrawalScreen.handleQuickAmount = stageWithdrawal;
+  useEffect(() => {
+    WithdrawalScreen.keypadHandlers = {
+      onDigit: handleDigit,
+      onClear: handleClear,
+      onCancel: handleCancel,
+      onEnter: handleEnter,
+    };
+    WithdrawalScreen.handleQuickAmount = stageWithdrawal;
+  }, [handleDigit, handleClear, handleCancel, handleEnter, stageWithdrawal]);
 
   const selectedAccount = state.accounts.find(
     (a) => a.id === state.selectedAccountId,

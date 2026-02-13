@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useATMContext } from "./hooks/useATMContext";
 import { useIdleTimer } from "./hooks/useIdleTimer";
@@ -78,9 +78,11 @@ export default function App() {
   // Track current screen in a ref so keypad handlers can read it at
   // event time (after AnimatePresence has mounted the screen component).
   const screenRef = useRef(state.currentScreen);
-  screenRef.current = state.currentScreen;
   const pendingRef = useRef(state.pendingTransaction);
-  pendingRef.current = state.pendingTransaction;
+  useEffect(() => {
+    screenRef.current = state.currentScreen;
+    pendingRef.current = state.pendingTransaction;
+  });
 
   const keypadRef = useRef({
     onDigit: (d: string) => {

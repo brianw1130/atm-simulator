@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { transfer } from "../../api/endpoints";
 import axios from "axios";
@@ -40,7 +40,9 @@ export function TransferConfirmScreen() {
     }
   }, [state.pendingTransaction, dispatch]);
 
-  TransferConfirmScreen.handleConfirm = handleConfirm;
+  useEffect(() => {
+    TransferConfirmScreen.handleConfirm = handleConfirm;
+  }, [handleConfirm]);
 
   const selectedAccount = state.accounts.find(
     (a) => a.id === state.selectedAccountId,
