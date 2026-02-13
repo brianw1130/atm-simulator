@@ -116,7 +116,9 @@ export default function App() {
 
   // Wire keypad to the current screen's handlers
   const screen = state.currentScreen;
-  if (screen === "pin_entry") {
+  if (screen === "welcome") {
+    keypadRef.current = WelcomeScreen.keypadHandlers;
+  } else if (screen === "pin_entry") {
     keypadRef.current = PinEntryScreen.keypadHandlers;
   } else if (screen === "withdrawal") {
     keypadRef.current = WithdrawalScreen.keypadHandlers;
@@ -334,7 +336,8 @@ export default function App() {
 
   const isCardInserted = state.currentScreen !== "welcome";
   const isKeypadActive =
-    (state.currentScreen === "pin_entry" ||
+    (state.currentScreen === "welcome" ||
+      state.currentScreen === "pin_entry" ||
       state.currentScreen === "withdrawal" ||
       (state.currentScreen === "deposit" &&
         state.pendingTransaction !== null) ||

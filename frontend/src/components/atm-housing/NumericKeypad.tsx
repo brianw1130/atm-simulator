@@ -22,6 +22,9 @@ export function NumericKeypad({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (disabled) return;
+      // Skip if user is typing in a native input (welcome screen card entry)
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key >= "0" && e.key <= "9") {
         onDigit(e.key);
       } else if (e.key === "Enter") {

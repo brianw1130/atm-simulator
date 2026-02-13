@@ -1,12 +1,38 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
+
+/** Strip non-digits and insert dashes: 1000-0001-0001 */
+function formatCardNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 12);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8)}`;
+}
 
 export function WelcomeScreen() {
   const { dispatch } = useATMContext();
   const [cardNumber, setCardNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleInsertCard = () => {
+  const handleDigit = useCallback((digit: string) => {
+    setCardNumber((prev) => formatCardNumber(prev + digit));
+    setError(null);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setCardNumber((prev) => {
+      const digits = prev.replace(/\D/g, "");
+      return formatCardNumber(digits.slice(0, -1));
+    });
+    setError(null);
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    setCardNumber("");
+    setError(null);
+  }, []);
+
+  const handleEnter = useCallback(() => {
     const trimmed = cardNumber.trim();
     if (!trimmed) {
       setError("Please enter your card number");
@@ -14,6 +40,14 @@ export function WelcomeScreen() {
     }
     setError(null);
     dispatch({ type: "INSERT_CARD", cardNumber: trimmed });
+  }, [cardNumber, dispatch]);
+
+  // Expose keypad handlers for App.tsx to wire to NumericKeypad
+  WelcomeScreen.keypadHandlers = {
+    onDigit: handleDigit,
+    onClear: handleClear,
+    onCancel: handleCancel,
+    onEnter: handleEnter,
   };
 
   return (
@@ -31,12 +65,15 @@ export function WelcomeScreen() {
           className="screen-input"
           type="text"
           value={cardNumber}
-          onChange={(e) => setCardNumber(e.target.value)}
+          onChange={(e) => {
+            setCardNumber(formatCardNumber(e.target.value));
+            setError(null);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleInsertCard();
+            if (e.key === "Enter") handleEnter();
           }}
           placeholder="1000-0001-0001"
-          maxLength={20}
+          maxLength={14}
           autoFocus
           data-testid="card-input"
         />
@@ -49,7 +86,7 @@ export function WelcomeScreen() {
       <div className="screen-content__footer">
         <button
           className="screen-btn"
-          onClick={handleInsertCard}
+          onClick={handleEnter}
           data-testid="insert-card-btn"
         >
           Insert Card
@@ -58,3 +95,11 @@ export function WelcomeScreen() {
     </div>
   );
 }
+
+// Static property for keypad handler wiring
+WelcomeScreen.keypadHandlers = {
+  onDigit: (_: string) => { /* noop */ },
+  onClear: () => { /* noop */ },
+  onCancel: () => { /* noop */ },
+  onEnter: () => { /* noop */ },
+};

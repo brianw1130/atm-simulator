@@ -78,10 +78,10 @@ describe("App", () => {
     });
   });
 
-  it("disables keypad on welcome screen", () => {
+  it("enables keypad on welcome screen for card number entry", () => {
     renderApp();
-    expect(screen.getByTestId("key-0")).toBeDisabled();
-    expect(screen.getByTestId("key-enter")).toBeDisabled();
+    expect(screen.getByTestId("key-0")).toBeEnabled();
+    expect(screen.getByTestId("key-enter")).toBeEnabled();
   });
 
   it("shows side buttons on main menu screen", () => {
