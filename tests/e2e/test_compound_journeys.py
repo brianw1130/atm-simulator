@@ -240,9 +240,7 @@ async def test_e2e_cmp_02_deposit_availability_progression(
 
 
 @pytest.mark.asyncio
-async def test_e2e_cmp_03_daily_limit_reset(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_e2e_cmp_03_daily_limit_reset(client: AsyncClient, db_session: AsyncSession) -> None:
     """E2E-CMP-03: Daily Limit Reset.
 
     Withdraw $400 (approaching $500 limit) → verify $100 remaining →

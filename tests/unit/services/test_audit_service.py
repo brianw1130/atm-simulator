@@ -90,23 +90,17 @@ class TestLogEventDetails:
             "denominations": {"twenties": 5, "total": 5},
             "metadata": {"source": "ATM-001"},
         }
-        entry = await log_event(
-            db_session, AuditEventType.WITHDRAWAL, details=nested
-        )
+        entry = await log_event(db_session, AuditEventType.WITHDRAWAL, details=nested)
         assert entry.details == nested
         assert entry.details["denominations"]["twenties"] == 5
 
     async def test_list_in_details(self, db_session: AsyncSession):
         details = {"accounts": [1, 2, 3], "action": "multi_check"}
-        entry = await log_event(
-            db_session, AuditEventType.BALANCE_INQUIRY, details=details
-        )
+        entry = await log_event(db_session, AuditEventType.BALANCE_INQUIRY, details=details)
         assert entry.details["accounts"] == [1, 2, 3]
 
     async def test_empty_dict_details(self, db_session: AsyncSession):
-        entry = await log_event(
-            db_session, AuditEventType.LOGOUT, details={}
-        )
+        entry = await log_event(db_session, AuditEventType.LOGOUT, details={})
         assert entry.details == {}
 
 
@@ -116,9 +110,7 @@ class TestLogEventQuerying:
         await log_event(db_session, AuditEventType.LOGIN_FAILED)
         await log_event(db_session, AuditEventType.LOGIN_SUCCESS)
 
-        stmt = select(AuditLog).where(
-            AuditLog.event_type == AuditEventType.LOGIN_SUCCESS
-        )
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.LOGIN_SUCCESS)
         results = list((await db_session.execute(stmt)).scalars().all())
         assert len(results) == 2
 
@@ -132,18 +124,10 @@ class TestLogEventQuerying:
         assert len(results) == 2
 
     async def test_query_by_session_id(self, db_session: AsyncSession):
-        await log_event(
-            db_session, AuditEventType.LOGIN_SUCCESS, session_id="sess-001"
-        )
-        await log_event(
-            db_session, AuditEventType.WITHDRAWAL, session_id="sess-001"
-        )
-        await log_event(
-            db_session, AuditEventType.LOGOUT, session_id="sess-001"
-        )
-        await log_event(
-            db_session, AuditEventType.LOGIN_SUCCESS, session_id="sess-002"
-        )
+        await log_event(db_session, AuditEventType.LOGIN_SUCCESS, session_id="sess-001")
+        await log_event(db_session, AuditEventType.WITHDRAWAL, session_id="sess-001")
+        await log_event(db_session, AuditEventType.LOGOUT, session_id="sess-001")
+        await log_event(db_session, AuditEventType.LOGIN_SUCCESS, session_id="sess-002")
 
         stmt = select(AuditLog).where(AuditLog.session_id == "sess-001")
         results = list((await db_session.execute(stmt)).scalars().all())
@@ -152,9 +136,7 @@ class TestLogEventQuerying:
     async def test_query_no_results(self, db_session: AsyncSession):
         await log_event(db_session, AuditEventType.LOGIN_SUCCESS)
 
-        stmt = select(AuditLog).where(
-            AuditLog.event_type == AuditEventType.ACCOUNT_FROZEN
-        )
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.ACCOUNT_FROZEN)
         results = list((await db_session.execute(stmt)).scalars().all())
         assert len(results) == 0
 
