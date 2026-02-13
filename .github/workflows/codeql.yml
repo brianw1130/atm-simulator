@@ -13,10 +13,6 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # SARIF upload requires GitHub Advanced Security on private repos.
-    # This ensures CI stays green while the repo is private.
-    # Remove continue-on-error after making the repo public.
-    continue-on-error: true
     permissions:
       security-events: write
       contents: read
