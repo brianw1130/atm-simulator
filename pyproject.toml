@@ -49,6 +49,7 @@ dev = [
     "fakeredis[lua]>=2.21.0",
     "pip-audit>=2.7.0",
     "locust>=2.29.0",
+    "bandit>=1.7.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -96,6 +97,10 @@ disallow_untyped_defs = false
 [[tool.mypy.overrides]]
 module = ["reportlab.*", "celery", "celery.*"]
 ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # B101 = assert usage (acceptable in non-prod code)
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

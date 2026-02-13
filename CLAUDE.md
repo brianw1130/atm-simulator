@@ -69,6 +69,11 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 | Frontend Linting | ESLint (strict) + TypeScript strict mode | Zero-warning policy, strict type checking |
 | Python Type Checking | mypy (strict mode) | Catch bugs early, especially important for financial logic |
 | API Documentation | Auto-generated via FastAPI/OpenAPI | Zero-effort, always in sync |
+| Python Security | Bandit + pip-audit | SAST + dependency vulnerability scanning |
+| Frontend Security | npm audit | Dependency vulnerability scanning |
+| Container Security | Trivy | Docker image + Terraform IaC scanning |
+| Secret Detection | Gitleaks | Leaked credentials in git history |
+| Dependency Updates | Dependabot | Automated PRs for vulnerable dependencies |
 | Cloud Hosting (Phase 3) | AWS (ECS Fargate or App Runner) | Better fit than Vercel for a Python backend with database |
 
 > **Why AWS over Vercel?** Vercel is optimized for frontend/Next.js deployments. A Python application with a PostgreSQL database, background jobs, and persistent state is a much better fit for AWS. Alternatives: Railway or Render for simpler deployment if full AWS is overkill.
@@ -743,7 +748,17 @@ frontend/src/__tests__/
 - Session tokens are cryptographically random (via `secrets.token_urlsafe`), opaque, and expire after 2 minutes of inactivity
 - **Rate limiting:** Maximum 5 authentication attempts per card number per 15-minute window (in addition to the 3-attempt lockout per session)
 - **No sensitive data in error messages.** Error responses must never reveal whether a card number exists — use generic "authentication failed" for both invalid card and invalid PIN.
-- **Dependency scanning:** `pip-audit` runs in CI to flag known vulnerabilities in dependencies
+- **Dependency scanning:** `pip-audit` (Python) and `npm audit` (frontend) run in CI to flag known vulnerabilities
+- **SAST scanning:** Bandit scans all Python source code for security anti-patterns (hardcoded passwords, `eval()`, weak crypto, insecure deserialization)
+- **Container/IaC scanning:** Trivy scans the filesystem for dependency CVEs and Terraform misconfigurations (CRITICAL/HIGH only)
+- **Secret detection:** Gitleaks scans full git history for leaked API keys, tokens, passwords, and private keys
+- **Automated dependency updates:** Dependabot opens weekly PRs for vulnerable pip, npm, and GitHub Actions dependencies
+
+> **TODO (Public Repo):** When the repository transitions to public, enable these free GitHub-native features:
+> - **CodeQL Analysis** — Add `.github/workflows/codeql.yml` for deep SAST (SQL injection, XSS, taint tracking). Free for public repos.
+> - **GitHub Secret Scanning** — Enable in Settings > Security. Detects leaked API keys/tokens.
+> - **Secret Push Protection** — Enable in Settings > Security. Blocks pushes containing secrets.
+> - **Dependabot Security Alerts** — Enable in Settings > Security. Automatic CVE notifications.
 
 ### Git Conventions
 
@@ -752,6 +767,7 @@ frontend/src/__tests__/
 - Every feature branch must have passing CI before merge
 - **PR requirements:** At minimum, the Team Lead must review all PRs. PRs touching `services/` or `utils/security.py` also require Security Engineer review.
 - **No force-pushes to `main`.** Branch protection rules enforced.
+- **All security scans must pass before merge.** Bandit, pip-audit, npm audit, Trivy, and Gitleaks are CI-blocking.
 
 ---
 
