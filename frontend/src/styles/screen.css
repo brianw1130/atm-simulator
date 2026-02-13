@@ -119,3 +119,153 @@
   border-color: var(--screen-text);
   box-shadow: 0 0 6px var(--screen-text);
 }
+
+/* Balance inquiry */
+.balance-display {
+  width: 100%;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--screen-text-dim);
+  margin-bottom: 8px;
+}
+
+.balance-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.balance-amount {
+  color: var(--screen-text-bright);
+  font-weight: bold;
+}
+
+.balance-transactions {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Mini-statement */
+.mini-statement {
+  width: 100%;
+  font-size: 11px;
+}
+
+.mini-statement__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(51, 153, 85, 0.2);
+  gap: 6px;
+}
+
+.mini-statement__date {
+  flex-shrink: 0;
+  color: var(--screen-text-dim);
+  width: 70px;
+}
+
+.mini-statement__desc {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-statement__amount {
+  flex-shrink: 0;
+  text-align: right;
+  width: 80px;
+}
+
+.amount-negative {
+  color: var(--screen-error);
+}
+
+.amount-positive {
+  color: var(--screen-text);
+}
+
+/* Amount input display */
+.amount-input {
+  font-size: 24px;
+  color: var(--screen-text-bright);
+  text-align: center;
+  padding: 8px;
+  margin: 8px 0;
+  border: 1px solid var(--screen-text-dim);
+  border-radius: 3px;
+  background: rgba(0, 30, 15, 0.6);
+  min-width: 160px;
+  font-family: "Courier New", Courier, monospace;
+}
+
+/* Confirm screen details */
+.confirm-details {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(51, 153, 85, 0.2);
+}
+
+.confirm-amount {
+  color: var(--screen-text-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Receipt details */
+.receipt-details {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(51, 153, 85, 0.15);
+}
+
+.receipt-ref {
+  font-size: 10px;
+  color: var(--screen-text-dim);
+}
+
+.receipt-message {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+/* Idle timer warning overlay */
+.idle-warning {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 10, 5, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  color: var(--screen-text);
+  font-family: "Courier New", Courier, monospace;
+}
+
+.idle-warning__countdown {
+  font-size: 36px;
+  color: var(--screen-error);
+  margin: 8px 0;
+  font-weight: bold;
+}

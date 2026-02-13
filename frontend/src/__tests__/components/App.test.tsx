@@ -13,6 +13,8 @@ vi.mock("../../api/endpoints", () => ({
   login: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
   listAccounts: vi.fn(),
+  getBalance: vi.fn().mockReturnValue(new Promise(() => {})),
+  refreshSession: vi.fn().mockResolvedValue({ message: "ok", timeout_seconds: "120" }),
 }));
 
 function renderApp() {
@@ -125,7 +127,7 @@ describe("App", () => {
     );
     await user.click(screen.getByTestId("side-btn-left-withdraw"));
     await waitFor(() => {
-      expect(screen.getByTestId("placeholder-screen")).toBeInTheDocument();
+      expect(screen.getByTestId("withdrawal-screen")).toBeInTheDocument();
     });
   });
 
@@ -152,7 +154,7 @@ describe("App", () => {
     });
   });
 
-  it("renders placeholder for unimplemented screens", () => {
+  it("renders withdrawal screen", () => {
     const state: ATMState = {
       ...INITIAL_ATM_STATE,
       currentScreen: "withdrawal",
@@ -163,7 +165,65 @@ describe("App", () => {
         <App />
       </TestProvider>,
     );
-    expect(screen.getByTestId("placeholder-screen")).toBeInTheDocument();
-    expect(screen.getByText("Coming in Sprint 2")).toBeInTheDocument();
+    expect(screen.getByTestId("withdrawal-screen")).toBeInTheDocument();
+  });
+
+  it("renders balance inquiry screen", () => {
+    const state: ATMState = {
+      ...INITIAL_ATM_STATE,
+      currentScreen: "balance_inquiry",
+      sessionId: "sess-123",
+      selectedAccountId: 1,
+      accounts: [
+        { id: 1, account_number: "1000-0001-0001", account_type: "CHECKING", balance: "5250.00", available_balance: "5250.00", status: "ACTIVE" },
+      ],
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("balance-inquiry-screen")).toBeInTheDocument();
+  });
+
+  it("renders error screen", () => {
+    const state: ATMState = {
+      ...INITIAL_ATM_STATE,
+      currentScreen: "error",
+      sessionId: "sess-123",
+      lastError: "Something went wrong",
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("error-screen")).toBeInTheDocument();
+  });
+
+  it("renders session timeout screen", () => {
+    const state: ATMState = {
+      ...INITIAL_ATM_STATE,
+      currentScreen: "session_timeout",
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("session-timeout-screen")).toBeInTheDocument();
+  });
+
+  it("renders maintenance screen", () => {
+    const state: ATMState = {
+      ...INITIAL_ATM_STATE,
+      currentScreen: "maintenance",
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("maintenance-screen")).toBeInTheDocument();
   });
 });

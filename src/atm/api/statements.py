@@ -7,13 +7,18 @@ Routes:
     POST /generate — Generate PDF statement for date range
     POST /generate-async — Queue async PDF statement generation
     GET /status/{task_id} — Check async statement generation status
+    GET /download/{filename} — Download generated PDF statement
 """
 
+import re
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
+from fastapi.responses import FileResponse
 
 from src.atm.api import CurrentSession, DbSession
+from src.atm.config import settings
 from src.atm.schemas.transaction import (
     ErrorResponse,
     StatementRequest,
@@ -23,6 +28,9 @@ from src.atm.services.statement_service import (
     StatementError,
     generate_statement,
 )
+
+# Only allow safe filenames: alphanumeric, hyphens, underscores, dots.
+_SAFE_FILENAME_RE = re.compile(r"^[\w\-]+\.pdf$")
 
 router = APIRouter()
 
@@ -128,3 +136,40 @@ async def get_statement_status(
         return {"task_id": task_id, "status": "failed", "error": str(result.result)}
     else:
         return {"task_id": task_id, "status": result.state.lower()}
+
+
+@router.get("/download/{filename}")
+async def download_statement(
+    filename: str,
+    session_info: CurrentSession,
+) -> FileResponse:
+    """Download a generated PDF statement.
+
+    Args:
+        filename: The PDF filename to download.
+        session_info: Validated session data from dependency.
+
+    Returns:
+        The PDF file as an attachment.
+    """
+    _ = session_info  # Ensures user is authenticated
+
+    if not _SAFE_FILENAME_RE.match(filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    file_path = Path(settings.statement_output_dir) / filename
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Statement not found",
+        )
+
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/pdf",
+        filename=filename,
+    )

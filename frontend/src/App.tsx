@@ -1,9 +1,13 @@
 import { useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useATMContext } from "./hooks/useATMContext";
+import { useIdleTimer } from "./hooks/useIdleTimer";
 import { ATMFrame } from "./components/atm-housing/ATMFrame";
 import { ScreenBezel } from "./components/atm-housing/ScreenBezel";
-import { SideButtons, type SideButtonConfig } from "./components/atm-housing/SideButtons";
+import {
+  SideButtons,
+  type SideButtonConfig,
+} from "./components/atm-housing/SideButtons";
 import { NumericKeypad } from "./components/atm-housing/NumericKeypad";
 import { CardSlot } from "./components/atm-housing/CardSlot";
 import { CashDispenser } from "./components/atm-housing/CashDispenser";
@@ -11,6 +15,17 @@ import { ReceiptPrinter } from "./components/atm-housing/ReceiptPrinter";
 import { WelcomeScreen } from "./components/screens/WelcomeScreen";
 import { PinEntryScreen } from "./components/screens/PinEntryScreen";
 import { MainMenuScreen } from "./components/screens/MainMenuScreen";
+import { BalanceInquiryScreen } from "./components/screens/BalanceInquiryScreen";
+import { WithdrawalScreen } from "./components/screens/WithdrawalScreen";
+import { WithdrawalConfirmScreen } from "./components/screens/WithdrawalConfirmScreen";
+import { WithdrawalReceiptScreen } from "./components/screens/WithdrawalReceiptScreen";
+import { DepositScreen } from "./components/screens/DepositScreen";
+import { DepositReceiptScreen } from "./components/screens/DepositReceiptScreen";
+import { TransferScreen } from "./components/screens/TransferScreen";
+import { TransferConfirmScreen } from "./components/screens/TransferConfirmScreen";
+import { TransferReceiptScreen } from "./components/screens/TransferReceiptScreen";
+import { StatementScreen } from "./components/screens/StatementScreen";
+import { PinChangeScreen } from "./components/screens/PinChangeScreen";
 import { SessionTimeoutScreen } from "./components/screens/SessionTimeoutScreen";
 import { ErrorScreen } from "./components/screens/ErrorScreen";
 import { MaintenanceModeScreen } from "./components/screens/MaintenanceModeScreen";
@@ -25,14 +40,15 @@ const screenTransition = {
 
 export default function App() {
   const { state, dispatch } = useATMContext();
+  const { showWarning, secondsLeft } = useIdleTimer();
+
   const keypadRef = useRef({
-    onDigit: (_: string) => { /* noop */ },
-    onClear: () => { /* noop */ },
-    onCancel: () => { /* noop */ },
-    onEnter: () => { /* noop */ },
+    onDigit: (_: string) => {},
+    onClear: () => {},
+    onCancel: () => {},
+    onEnter: () => {},
   });
 
-  // Navigate via side button
   const navigateTo = useCallback(
     (screen: ATMScreen) => {
       dispatch({ type: "NAVIGATE", screen });
@@ -49,7 +65,15 @@ export default function App() {
     dispatch({ type: "LOGOUT" });
   }, [dispatch]);
 
-  // Determine which screen to render
+  const handleBack = useCallback(() => {
+    dispatch({ type: "GO_BACK" });
+  }, [dispatch]);
+
+  const handleAnotherTransaction = useCallback(() => {
+    dispatch({ type: "NAVIGATE", screen: "main_menu" });
+  }, [dispatch]);
+
+  // Render the screen component for the current state
   const renderScreen = () => {
     switch (state.currentScreen) {
       case "welcome":
@@ -58,31 +82,50 @@ export default function App() {
         return <PinEntryScreen />;
       case "main_menu":
         return <MainMenuScreen />;
+      case "balance_inquiry":
+        return <BalanceInquiryScreen />;
+      case "withdrawal":
+        return <WithdrawalScreen />;
+      case "withdrawal_confirm":
+        return <WithdrawalConfirmScreen />;
+      case "withdrawal_receipt":
+        return <WithdrawalReceiptScreen />;
+      case "deposit":
+        return <DepositScreen />;
+      case "deposit_receipt":
+        return <DepositReceiptScreen />;
+      case "transfer":
+        return <TransferScreen />;
+      case "transfer_confirm":
+        return <TransferConfirmScreen />;
+      case "transfer_receipt":
+        return <TransferReceiptScreen />;
+      case "statement":
+        return <StatementScreen />;
+      case "pin_change":
+        return <PinChangeScreen />;
       case "session_timeout":
         return <SessionTimeoutScreen />;
       case "error":
         return <ErrorScreen />;
       case "maintenance":
         return <MaintenanceModeScreen />;
-      default:
-        // Placeholder for Sprint 2 screens
-        return (
-          <div className="screen-content" data-testid="placeholder-screen">
-            <div className="screen-content__header">
-              <h2>{state.currentScreen.replace(/_/g, " ").toUpperCase()}</h2>
-            </div>
-            <div className="screen-content__body">
-              <p className="screen-text-dim">Coming in Sprint 2</p>
-            </div>
-          </div>
-        );
     }
   };
 
-  // Wire keypad to current screen
-  if (state.currentScreen === "pin_entry") {
+  // Wire keypad to the current screen's handlers
+  const screen = state.currentScreen;
+  if (screen === "pin_entry") {
     keypadRef.current = PinEntryScreen.keypadHandlers;
-  } else if (state.currentScreen === "welcome") {
+  } else if (screen === "withdrawal") {
+    keypadRef.current = WithdrawalScreen.keypadHandlers;
+  } else if (screen === "deposit" && state.pendingTransaction) {
+    keypadRef.current = DepositScreen.keypadHandlers;
+  } else if (screen === "transfer") {
+    keypadRef.current = TransferScreen.keypadHandlers;
+  } else if (screen === "pin_change") {
+    keypadRef.current = PinChangeScreen.keypadHandlers;
+  } else {
     keypadRef.current = {
       onDigit: () => {},
       onClear: () => {},
@@ -91,32 +134,212 @@ export default function App() {
     };
   }
 
-  // Build side buttons based on current screen
+  // Build side button config for left/right panels
   const buildSideButtons = (
     side: "left" | "right",
   ): (SideButtonConfig | null)[] => {
-    if (state.currentScreen === "main_menu") {
-      const config = side === "left"
-        ? MainMenuScreen.sideButtons.left
-        : MainMenuScreen.sideButtons.right;
+    switch (state.currentScreen) {
+      case "main_menu": {
+        const config =
+          side === "left"
+            ? MainMenuScreen.sideButtons.left
+            : MainMenuScreen.sideButtons.right;
 
-      return config.map((item) => {
-        if (!item) return null;
-        return {
-          label: item.label,
-          onClick: item.screen
-            ? () => navigateTo(item.screen)
-            : () => void handleLogout(),
-        };
-      });
+        return config.map((item) => {
+          if (!item) return null;
+          return {
+            label: item.label,
+            onClick: item.screen
+              ? () => navigateTo(item.screen)
+              : () => void handleLogout(),
+          };
+        });
+      }
+
+      case "balance_inquiry": {
+        if (side === "left") {
+          return state.accounts.map((acct) => ({
+            label: acct.account_type === "CHECKING" ? "Checking" : "Savings",
+            onClick: () =>
+              dispatch({ type: "SELECT_ACCOUNT", accountId: acct.id }),
+          }));
+        }
+        return [null, null, null, { label: "Back", onClick: handleBack }];
+      }
+
+      case "withdrawal": {
+        if (side === "left") {
+          return [
+            {
+              label: "$20",
+              onClick: () => WithdrawalScreen.handleQuickAmount(2000),
+            },
+            {
+              label: "$40",
+              onClick: () => WithdrawalScreen.handleQuickAmount(4000),
+            },
+            {
+              label: "$60",
+              onClick: () => WithdrawalScreen.handleQuickAmount(6000),
+            },
+            {
+              label: "$100",
+              onClick: () => WithdrawalScreen.handleQuickAmount(10000),
+            },
+          ];
+        }
+        return [
+          {
+            label: "$200",
+            onClick: () => WithdrawalScreen.handleQuickAmount(20000),
+          },
+          null,
+          null,
+          { label: "Back", onClick: handleBack },
+        ];
+      }
+
+      case "withdrawal_confirm":
+        if (side === "left") return [null, null, null, null];
+        return [
+          null,
+          null,
+          {
+            label: "Confirm",
+            onClick: () => void WithdrawalConfirmScreen.handleConfirm(),
+          },
+          { label: "Cancel", onClick: handleBack },
+        ];
+
+      case "withdrawal_receipt":
+      case "deposit_receipt":
+      case "transfer_receipt":
+        if (side === "left") return [null, null, null, null];
+        return [
+          null,
+          null,
+          { label: "Another", onClick: handleAnotherTransaction },
+          { label: "Done", onClick: () => void handleLogout() },
+        ];
+
+      case "deposit": {
+        if (!state.pendingTransaction) {
+          // Type selection phase
+          if (side === "left") {
+            return [
+              {
+                label: "Cash",
+                onClick: () =>
+                  dispatch({
+                    type: "STAGE_TRANSACTION",
+                    transaction: {
+                      type: "deposit",
+                      amountCents: 0,
+                      depositType: "cash",
+                    },
+                  }),
+              },
+              {
+                label: "Check",
+                onClick: () =>
+                  dispatch({
+                    type: "STAGE_TRANSACTION",
+                    transaction: {
+                      type: "deposit",
+                      amountCents: 0,
+                      depositType: "check",
+                    },
+                  }),
+              },
+              null,
+              null,
+            ];
+          }
+          return [null, null, null, { label: "Back", onClick: handleBack }];
+        }
+        // Amount entry phase
+        if (side === "left") return [null, null, null, null];
+        return [null, null, null, { label: "Back", onClick: handleBack }];
+      }
+
+      case "transfer": {
+        if (side === "left") {
+          // Show own accounts as quick destinations, pad to 4
+          const otherAccounts = state.accounts
+            .filter((a) => a.id !== state.selectedAccountId)
+            .map(
+              (acct): SideButtonConfig => ({
+                label:
+                  acct.account_type === "CHECKING" ? "Checking" : "Savings",
+                onClick: () =>
+                  TransferScreen.setOwnAccountDestination(
+                    acct.account_number,
+                  ),
+              }),
+            );
+          const padded: (SideButtonConfig | null)[] = [
+            ...otherAccounts,
+            null,
+            null,
+            null,
+            null,
+          ];
+          return padded.slice(0, 4);
+        }
+        return [null, null, null, { label: "Back", onClick: handleBack }];
+      }
+
+      case "transfer_confirm":
+        if (side === "left") return [null, null, null, null];
+        return [
+          null,
+          null,
+          {
+            label: "Confirm",
+            onClick: () => void TransferConfirmScreen.handleConfirm(),
+          },
+          { label: "Cancel", onClick: handleBack },
+        ];
+
+      case "statement": {
+        if (side === "left") {
+          return [
+            {
+              label: "7 Days",
+              onClick: () => void StatementScreen.handleGenerate(7),
+            },
+            {
+              label: "30 Days",
+              onClick: () => void StatementScreen.handleGenerate(30),
+            },
+            {
+              label: "90 Days",
+              onClick: () => void StatementScreen.handleGenerate(90),
+            },
+            null,
+          ];
+        }
+        return [null, null, null, { label: "Back", onClick: handleBack }];
+      }
+
+      case "pin_change":
+        if (side === "left") return [null, null, null, null];
+        return [null, null, null, { label: "Cancel", onClick: handleBack }];
+
+      default:
+        return [null, null, null, null];
     }
-
-    // Default: no side buttons active
-    return [null, null, null, null];
   };
 
   const isCardInserted = state.currentScreen !== "welcome";
-  const isKeypadActive = state.currentScreen === "pin_entry";
+  const isKeypadActive =
+    (state.currentScreen === "pin_entry" ||
+      state.currentScreen === "withdrawal" ||
+      (state.currentScreen === "deposit" &&
+        state.pendingTransaction !== null) ||
+      state.currentScreen === "transfer" ||
+      state.currentScreen === "pin_change") &&
+    !state.isLoading;
 
   return (
     <ATMFrame>
@@ -130,11 +353,24 @@ export default function App() {
               initial="enter"
               animate="center"
               exit="exit"
-              style={{ height: "100%", display: "flex", flexDirection: "column" }}
+              style={{
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
               {renderScreen()}
             </motion.div>
           </AnimatePresence>
+          {showWarning && (
+            <div className="idle-warning" data-testid="idle-warning">
+              <p>Session expires in</p>
+              <p className="idle-warning__countdown">{secondsLeft}s</p>
+              <p className="screen-text-dim">
+                Press any key to continue
+              </p>
+            </div>
+          )}
         </ScreenBezel>
         <SideButtons side="right" buttons={buildSideButtons("right")} />
       </div>

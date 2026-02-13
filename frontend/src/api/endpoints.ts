@@ -96,3 +96,8 @@ export async function generateStatement(
   );
   return response.data;
 }
+
+export function getStatementDownloadUrl(filePath: string): string {
+  const filename = filePath.split("/").pop() ?? "";
+  return `/api/v1/statements/download/${filename}`;
+}
