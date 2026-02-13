@@ -39,10 +39,22 @@
 }
 
 .key:active {
-  transform: translateY(2px);
+  transform: translateY(2px) scale(0.97);
   box-shadow:
     0 1px 0 var(--key-shadow),
     0 2px 3px rgba(0, 0, 0, 0.2);
+  filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key {
+    transition: none;
+  }
+
+  .key:active {
+    transform: none;
+    filter: none;
+  }
 }
 
 .key:hover {

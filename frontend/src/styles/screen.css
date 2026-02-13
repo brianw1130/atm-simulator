@@ -246,6 +246,38 @@
   font-size: 12px;
 }
 
+/* Loading overlay spinner */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 10, 5, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  color: var(--screen-text);
+  font-family: "Courier New", Courier, monospace;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+}
+
+.loading-spinner__circle {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(51, 255, 136, 0.2);
+  border-top-color: var(--screen-text);
+  border-radius: 50%;
+}
+
 /* Idle timer warning overlay */
 .idle-warning {
   position: absolute;

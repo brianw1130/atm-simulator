@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useATMContext } from "./hooks/useATMContext";
 import { useIdleTimer } from "./hooks/useIdleTimer";
 import { ATMFrame } from "./components/atm-housing/ATMFrame";
@@ -29,18 +29,19 @@ import { PinChangeScreen } from "./components/screens/PinChangeScreen";
 import { SessionTimeoutScreen } from "./components/screens/SessionTimeoutScreen";
 import { ErrorScreen } from "./components/screens/ErrorScreen";
 import { MaintenanceModeScreen } from "./components/screens/MaintenanceModeScreen";
+import {
+  screenVariants,
+  screenVariantsReduced,
+  overlayVariants,
+  countdownPulse,
+} from "./utils/motion";
 import type { ATMScreen } from "./state/types";
 import { logout as apiLogout } from "./api/endpoints";
-
-const screenTransition = {
-  enter: { opacity: 0, x: 20 },
-  center: { opacity: 1, x: 0, transition: { duration: 0.2 } },
-  exit: { opacity: 0, x: -20, transition: { duration: 0.15 } },
-};
 
 export default function App() {
   const { state, dispatch } = useATMContext();
   const { showWarning, secondsLeft } = useIdleTimer();
+  const reducedMotion = useReducedMotion();
 
   const keypadRef = useRef({
     onDigit: (_: string) => {},
@@ -341,6 +342,23 @@ export default function App() {
       state.currentScreen === "pin_change") &&
     !state.isLoading;
 
+  // Derive animation flags from state — no reducer changes needed
+  const isCashDispensing =
+    state.currentScreen === "withdrawal_receipt" &&
+    state.lastReceipt?.receiptType === "withdrawal";
+
+  const isReceiptPrinting =
+    state.currentScreen === "withdrawal_receipt" ||
+    state.currentScreen === "deposit_receipt" ||
+    state.currentScreen === "transfer_receipt";
+
+  const billCount =
+    isCashDispensing && state.lastReceipt?.receiptType === "withdrawal"
+      ? Math.min(state.lastReceipt.denominations.total_bills, 5)
+      : 0;
+
+  const activeVariants = reducedMotion ? screenVariantsReduced : screenVariants;
+
   return (
     <ATMFrame>
       <div className="atm-screen-section">
@@ -349,7 +367,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             <motion.div
               key={state.currentScreen}
-              variants={screenTransition}
+              variants={activeVariants}
               initial="enter"
               animate="center"
               exit="exit"
@@ -362,21 +380,38 @@ export default function App() {
               {renderScreen()}
             </motion.div>
           </AnimatePresence>
-          {showWarning && (
-            <div className="idle-warning" data-testid="idle-warning">
-              <p>Session expires in</p>
-              <p className="idle-warning__countdown">{secondsLeft}s</p>
-              <p className="screen-text-dim">
-                Press any key to continue
-              </p>
-            </div>
-          )}
+          <AnimatePresence>
+            {showWarning && (
+              <motion.div
+                className="idle-warning"
+                data-testid="idle-warning"
+                variants={!reducedMotion ? overlayVariants : undefined}
+                initial={!reducedMotion ? "hidden" : undefined}
+                animate={!reducedMotion ? "visible" : undefined}
+                exit={!reducedMotion ? "exit" : undefined}
+              >
+                <p>Session expires in</p>
+                <motion.p
+                  className="idle-warning__countdown"
+                  key={secondsLeft}
+                  variants={!reducedMotion ? countdownPulse : undefined}
+                  initial={!reducedMotion ? "initial" : undefined}
+                  animate={!reducedMotion ? "animate" : undefined}
+                >
+                  {secondsLeft}s
+                </motion.p>
+                <p className="screen-text-dim">
+                  Press any key to continue
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </ScreenBezel>
         <SideButtons side="right" buttons={buildSideButtons("right")} />
       </div>
 
       <div className="atm-slots-section">
-        <ReceiptPrinter />
+        <ReceiptPrinter printing={isReceiptPrinting} />
         <CardSlot active={isCardInserted} />
       </div>
 
@@ -388,7 +423,7 @@ export default function App() {
           onEnter={() => keypadRef.current.onEnter()}
           disabled={!isKeypadActive || state.isLoading}
         />
-        <CashDispenser />
+        <CashDispenser dispensing={isCashDispensing} billCount={billCount} />
       </div>
     </ATMFrame>
   );

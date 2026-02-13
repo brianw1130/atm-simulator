@@ -30,9 +30,29 @@
   border-radius: 50%;
   background: #33aa33;
   box-shadow: 0 0 4px #33aa33;
+  z-index: 2;
+  transition: background 0.3s, box-shadow 0.3s;
 }
 
 .card-slot__indicator--inactive {
   background: #555;
   box-shadow: none;
+}
+
+/* Animated card edge element */
+.card-slot__card {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  width: 80px;
+  height: 8px;
+  background: linear-gradient(180deg, #d4a843 0%, #b8922e 100%);
+  border-radius: 1px;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-slot__indicator {
+    transition: none;
+  }
 }

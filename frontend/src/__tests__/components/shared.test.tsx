@@ -11,6 +11,21 @@ describe("LoadingOverlay", () => {
     expect(screen.getByText("Processing...")).toBeInTheDocument();
     expect(screen.getByText("Please wait")).toBeInTheDocument();
   });
+
+  it("renders spinner element", () => {
+    render(<LoadingOverlay />);
+    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
+  });
+
+  it("renders when visible is true", () => {
+    render(<LoadingOverlay visible={true} />);
+    expect(screen.getByTestId("loading-overlay")).toBeInTheDocument();
+  });
+
+  it("does not render when visible is false", () => {
+    render(<LoadingOverlay visible={false} />);
+    expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument();
+  });
 });
 
 describe("MiniStatement", () => {
