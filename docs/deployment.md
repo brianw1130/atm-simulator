@@ -293,6 +293,16 @@ Supporting Services:
 - Worker service `desired_count=0` by default (saving ~$7.50/month at idle)
 - No NAT Gateway — all resources in public subnets
 
+> **TODO: Add HTTPS support.** The app currently serves plain HTTP on port 8000.
+> For production use, add an Application Load Balancer (ALB) with an ACM
+> certificate for TLS termination. This requires:
+>
+> 1. A registered domain name (Route 53 or external registrar)
+> 2. An ACM certificate (free, but requires domain validation)
+> 3. A new `alb` Terraform module (ALB, target group, HTTPS listener, HTTP→HTTPS redirect)
+> 4. Update the Fargate security group to only accept traffic from the ALB
+> 5. Estimated added cost: ~$16/month for the ALB
+
 ### Infrastructure Setup with Terraform
 
 All infrastructure is defined in `infra/terraform/` using modular HCL.
