@@ -231,6 +231,17 @@ Runs on every push to `main` and on every pull request targeting `main`.
 | **frontend-build** | Runs `npm run build` and verifies `dist/index.html` exists. |
 | **terraform** | Runs `terraform fmt -check`, `terraform init`, and `terraform validate`. |
 
+### CodeQL Workflow (`.github/workflows/codeql.yml`)
+
+Runs on every push to `main`, on every pull request, and weekly (Monday 06:00 UTC).
+
+| Job | What It Does |
+|---|---|
+| **analyze (python)** | Deep SAST: SQL injection, insecure deserialization, taint tracking in Python source. |
+| **analyze (javascript-typescript)** | Deep SAST: XSS, prototype pollution, injection flaws in React/TypeScript code. |
+
+> **Note:** CodeQL is free for public repositories. For private repos, it requires GitHub Advanced Security.
+
 A failing job blocks pull request merges.
 
 ### Deploy Workflow (`.github/workflows/deploy.yml`)

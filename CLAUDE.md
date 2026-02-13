@@ -754,11 +754,12 @@ frontend/src/__tests__/
 - **Secret detection:** Gitleaks scans full git history for leaked API keys, tokens, passwords, and private keys
 - **Automated dependency updates:** Dependabot opens weekly PRs for vulnerable pip, npm, and GitHub Actions dependencies
 
-> **TODO (Public Repo):** When the repository transitions to public, enable these free GitHub-native features:
-> - **CodeQL Analysis** — Add `.github/workflows/codeql.yml` for deep SAST (SQL injection, XSS, taint tracking). Free for public repos.
-> - **GitHub Secret Scanning** — Enable in Settings > Security. Detects leaked API keys/tokens.
-> - **Secret Push Protection** — Enable in Settings > Security. Blocks pushes containing secrets.
-> - **Dependabot Security Alerts** — Enable in Settings > Security. Automatic CVE notifications.
+- **CodeQL Analysis:** `.github/workflows/codeql.yml` runs deep SAST (SQL injection, XSS, taint tracking) for both Python and TypeScript on every push/PR and weekly. Free for public repos; requires GitHub Advanced Security for private repos.
+
+> **Public Repo Checklist:** After making the repository public, enable these free GitHub-native features in **Settings > Code security and analysis**:
+> - **GitHub Secret Scanning** — Detects leaked API keys/tokens in pushed code.
+> - **Secret Push Protection** — Blocks pushes containing secrets before they reach the repository.
+> - **Dependabot Security Alerts** — Automatic CVE notifications for vulnerable dependencies.
 
 ### Git Conventions
 

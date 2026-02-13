@@ -167,9 +167,9 @@ atm-simulator/
 
 **Testing:** pytest (582 tests) / Vitest (223 tests) / Playwright (36 tests)
 
-**Infrastructure:** Docker / GitHub Actions (11 CI jobs) / Terraform / AWS (ECS Fargate)
+**Infrastructure:** Docker / GitHub Actions (13 CI jobs) / Terraform / AWS (ECS Fargate)
 
-**Security:** Bandit / pip-audit / npm audit / Trivy / Gitleaks / Dependabot
+**Security:** CodeQL / Bandit / pip-audit / npm audit / Trivy / Gitleaks / Dependabot
 
 ## License
 
