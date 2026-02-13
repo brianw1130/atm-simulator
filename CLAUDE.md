@@ -455,8 +455,10 @@ atm-simulator/
 3. Keypad + side button press feedback
 4. Loading spinner overlay, session timeout warning overlay
 5. ATM typography (monospace/LCD font), CRT glow effect, responsive scaling
-6. Playwright browser E2E tests (18-22 tests)
-7. **Gate:** All animations smooth (60fps). Playwright E2E passes. Feels like a real ATM.
+6. Playwright browser E2E tests (36 tests across 9 spec files)
+7. On-screen labels aligned with physical side buttons (real ATM style: labels on screen edges with ◄/► indicators)
+8. Fix `AccountSummary` API schema to include `id` field (required for balance inquiry routing)
+9. **Gate:** All animations smooth (60fps). Playwright E2E passes. Feels like a real ATM. **COMPLETE.**
 
 **Sprint 4 — Docker, Documentation, Final Polish**
 1. Update Dockerfile with Node.js build stage (multi-stage)
@@ -708,8 +710,8 @@ tests/
 #### Frontend Test Execution
 
 - **Both test suites must pass independently before any commit/push:**
-  - `pytest --cov=src/atm` — Python backend (562+ tests)
-  - `npx vitest run --coverage` — React frontend (109+ tests, growing)
+  - `pytest --cov=src/atm` — Python backend (582 tests)
+  - `npx vitest run --coverage` — React frontend (223 tests)
 - **CI runs both suites in parallel** — 5 Python jobs + 3 frontend jobs (8 total)
 - **Failing tests in either suite block merge.** No exceptions.
 - **Frontend tests use jsdom** for component/hook tests and **Playwright** for browser E2E tests.

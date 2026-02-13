@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 
 const MAX_ACCOUNT_DIGITS = 14;
@@ -86,7 +86,7 @@ export function TransferScreen() {
     }
   }, [phase, destinationStr, amountStr, dispatch]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     TransferScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

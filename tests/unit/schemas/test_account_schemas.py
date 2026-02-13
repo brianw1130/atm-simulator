@@ -20,12 +20,14 @@ from src.atm.schemas.account import (
 class TestAccountSummary:
     def test_creation_with_valid_data(self):
         summary = AccountSummary(
+            id=1,
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,
             balance="$5,250.00",
             available_balance="$5,250.00",
             status=AccountStatus.ACTIVE,
         )
+        assert summary.id == 1
         assert summary.account_number == "****-****-0001"
         assert summary.account_type == AccountType.CHECKING
         assert summary.balance == "$5,250.00"
@@ -34,6 +36,7 @@ class TestAccountSummary:
 
     def test_savings_account_type(self):
         summary = AccountSummary(
+            id=2,
             account_number="****-****-0002",
             account_type=AccountType.SAVINGS,
             balance="$12,500.00",
@@ -44,6 +47,7 @@ class TestAccountSummary:
 
     def test_frozen_status(self):
         summary = AccountSummary(
+            id=3,
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,
             balance="$0.00",
@@ -54,6 +58,7 @@ class TestAccountSummary:
 
     def test_closed_status(self):
         summary = AccountSummary(
+            id=4,
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,
             balance="$0.00",
@@ -82,6 +87,7 @@ class TestBalanceInquiryResponse:
     def test_creation_with_transactions(self):
         now = datetime.now(tz=UTC)
         account = AccountSummary(
+            id=1,
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,
             balance="$5,250.00",
@@ -105,6 +111,7 @@ class TestBalanceInquiryResponse:
 
     def test_creation_with_empty_transactions(self):
         account = AccountSummary(
+            id=1,
             account_number="****-****-0001",
             account_type=AccountType.CHECKING,
             balance="$0.00",
@@ -122,6 +129,7 @@ class TestAccountListResponse:
     def test_creation_with_multiple_accounts(self):
         accounts = [
             AccountSummary(
+                id=1,
                 account_number="****-****-0001",
                 account_type=AccountType.CHECKING,
                 balance="$5,250.00",
@@ -129,6 +137,7 @@ class TestAccountListResponse:
                 status=AccountStatus.ACTIVE,
             ),
             AccountSummary(
+                id=2,
                 account_number="****-****-0002",
                 account_type=AccountType.SAVINGS,
                 balance="$12,500.00",

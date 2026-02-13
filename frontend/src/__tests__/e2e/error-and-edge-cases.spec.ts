@@ -2,10 +2,10 @@ import { test, expect } from "@playwright/test";
 
 async function loginAsAlice(page: import("@playwright/test").Page) {
   await page.goto("/");
-  const input = page.getByTestId("card-number-input");
+  const input = page.getByTestId("card-input");
   await input.fill("1000-0001-0001");
   await page.getByTestId("key-enter").click();
-  await expect(page.getByText("Enter PIN")).toBeVisible();
+  await expect(page.getByText("Enter Your PIN")).toBeVisible();
   await page.getByTestId("key-1").click();
   await page.getByTestId("key-2").click();
   await page.getByTestId("key-3").click();
@@ -19,10 +19,10 @@ test.describe("Error and Edge Cases", () => {
     await page.goto("/");
 
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
 
     // Type some digits
     await page.getByTestId("key-1").click();
@@ -106,10 +106,10 @@ test.describe("Error and Edge Cases", () => {
     await page.goto("/");
 
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
 
     // Press Escape to cancel
     await page.keyboard.press("Escape");

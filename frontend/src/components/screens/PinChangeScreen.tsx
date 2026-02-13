@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { changePin } from "../../api/endpoints";
 import axios from "axios";
@@ -95,7 +95,7 @@ export function PinChangeScreen() {
     }
   }, [phase, currentPin, newPin, confirmPin, dispatch]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     PinChangeScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

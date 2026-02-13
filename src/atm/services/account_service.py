@@ -119,6 +119,7 @@ async def get_account_balance(
 
     return {
         "account": {
+            "id": account.id,
             "account_number": mask_account_number(account.account_number),
             "account_type": account.account_type,
             "balance": _format_cents(account.balance_cents),

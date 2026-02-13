@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 
 /** Strip non-digits and insert dashes: 1000-0001-0001 */
@@ -43,7 +43,7 @@ export function WelcomeScreen() {
   }, [cardNumber, dispatch]);
 
   // Expose keypad handlers for App.tsx to wire to NumericKeypad
-  useEffect(() => {
+  useLayoutEffect(() => {
     WelcomeScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

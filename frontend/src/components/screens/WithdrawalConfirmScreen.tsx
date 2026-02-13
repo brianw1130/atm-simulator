@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { withdraw } from "../../api/endpoints";
 import axios from "axios";
@@ -36,7 +36,7 @@ export function WithdrawalConfirmScreen() {
     }
   }, [state.pendingTransaction, dispatch]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     WithdrawalConfirmScreen.handleConfirm = handleConfirm;
   }, [handleConfirm]);
 

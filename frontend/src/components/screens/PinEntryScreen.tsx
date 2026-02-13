@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { login, listAccounts } from "../../api/endpoints";
 import axios from "axios";
@@ -73,7 +73,7 @@ export function PinEntryScreen() {
   }, [pin, state.cardNumber, dispatch]);
 
   // Expose keypad handlers for App.tsx to wire to NumericKeypad
-  useEffect(() => {
+  useLayoutEffect(() => {
     PinEntryScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

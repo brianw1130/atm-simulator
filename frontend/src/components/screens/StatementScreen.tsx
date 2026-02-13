@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { generateStatement } from "../../api/endpoints";
 import type { StatementResponse } from "../../api/types";
@@ -31,7 +31,7 @@ export function StatementScreen() {
     [dispatch],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     StatementScreen.handleGenerate = handleGenerate;
   }, [handleGenerate]);
 

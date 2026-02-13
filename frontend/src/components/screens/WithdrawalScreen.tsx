@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 
 const MAX_AMOUNT_DIGITS = 5;
@@ -53,7 +53,7 @@ export function WithdrawalScreen() {
     stageWithdrawal(amount * 100);
   }, [amountStr, stageWithdrawal]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     WithdrawalScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

@@ -47,6 +47,7 @@ async def list_accounts(
     accounts = await get_customer_accounts(db, session_info["customer_id"])
     summaries = [
         AccountSummary(
+            id=acct.id,
             account_number=mask_account_number(acct.account_number),
             account_type=acct.account_type,
             balance=acct.balance_dollars,

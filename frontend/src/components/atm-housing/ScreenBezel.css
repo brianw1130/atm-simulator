@@ -57,7 +57,9 @@
   }
 }
 
-/* On-screen labels aligned with physical side buttons */
+/* On-screen labels aligned with physical side buttons.
+   No vertical padding here — the bezel's 8px padding already
+   provides the offset that matches the side-buttons padding. */
 .screen-labels {
   position: absolute;
   top: 0;
@@ -65,7 +67,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  padding: 8px 0;
+  gap: 4px;
   z-index: 5;
   pointer-events: none;
 }

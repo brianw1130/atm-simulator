@@ -9,7 +9,7 @@ test.describe("Overlays and Housing Components", () => {
     await expect(indicator).toHaveClass(/card-slot__indicator--inactive/);
 
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
 
@@ -21,10 +21,10 @@ test.describe("Overlays and Housing Components", () => {
     await page.goto("/");
 
     // Insert card and login
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
     await page.getByTestId("key-1").click();
     await page.getByTestId("key-2").click();
     await page.getByTestId("key-3").click();
@@ -41,12 +41,12 @@ test.describe("Overlays and Housing Components", () => {
     await page.goto("/");
 
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.keyboard.press("Enter");
 
     // Should be on PIN entry screen
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
 
     // Type PIN via physical keyboard
     await page.keyboard.press("1");

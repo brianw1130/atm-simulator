@@ -11,6 +11,7 @@ class AccountSummary(BaseModel):
     """Summary view of an account for balance inquiries.
 
     Attributes:
+        id: Account primary key (used for API calls like balance inquiry).
         account_number: Masked account number (last 4 visible).
         account_type: CHECKING or SAVINGS.
         balance: Formatted total balance (e.g., "$1,234.56").
@@ -18,6 +19,7 @@ class AccountSummary(BaseModel):
         status: Account status.
     """
 
+    id: int
     account_number: str
     account_type: AccountType
     balance: str

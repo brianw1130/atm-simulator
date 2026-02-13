@@ -19,7 +19,7 @@ test.describe("Welcome and Authentication", () => {
 
   test("Welcome screen accepts card number input", async ({ page }) => {
     await expect(page.getByText("Welcome")).toBeVisible();
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await expect(input).toBeVisible();
     await input.fill("1000-0001-0001");
     await expect(input).toHaveValue("1000-0001-0001");
@@ -27,12 +27,12 @@ test.describe("Welcome and Authentication", () => {
 
   test("PIN entry via numeric keypad clicks", async ({ page }) => {
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
 
     // Should be on PIN entry screen
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
 
     // Click digits on keypad
     await page.getByTestId("key-1").click();
@@ -47,12 +47,12 @@ test.describe("Welcome and Authentication", () => {
 
   test("Successful login flow (card → PIN → main menu)", async ({ page }) => {
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
 
     // Enter PIN
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
     await page.getByTestId("key-1").click();
     await page.getByTestId("key-2").click();
     await page.getByTestId("key-3").click();
@@ -65,12 +65,12 @@ test.describe("Welcome and Authentication", () => {
 
   test("Failed PIN shows error message", async ({ page }) => {
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
 
     // Enter wrong PIN
-    await expect(page.getByText("Enter PIN")).toBeVisible();
+    await expect(page.getByText("Enter Your PIN")).toBeVisible();
     await page.getByTestId("key-9").click();
     await page.getByTestId("key-9").click();
     await page.getByTestId("key-9").click();

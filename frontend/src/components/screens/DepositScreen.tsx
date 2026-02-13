@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { deposit } from "../../api/endpoints";
 import axios from "axios";
@@ -103,7 +103,7 @@ export function DepositScreen() {
     }
   }, [phase, amountStr, isCheck, checkNumberStr, submitDeposit]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     DepositScreen.keypadHandlers = {
       onDigit: handleDigit,
       onClear: handleClear,

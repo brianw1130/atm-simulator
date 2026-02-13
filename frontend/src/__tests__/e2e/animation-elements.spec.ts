@@ -8,7 +8,7 @@ test.describe("Animation and UI Elements", () => {
     await expect(page.getByTestId("card-slot-card")).not.toBeVisible();
 
     // Insert card
-    const input = page.getByTestId("card-number-input");
+    const input = page.getByTestId("card-input");
     await input.fill("1000-0001-0001");
     await page.getByTestId("key-enter").click();
 

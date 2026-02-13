@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { transfer } from "../../api/endpoints";
 import axios from "axios";
@@ -40,7 +40,7 @@ export function TransferConfirmScreen() {
     }
   }, [state.pendingTransaction, dispatch]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     TransferConfirmScreen.handleConfirm = handleConfirm;
   }, [handleConfirm]);
 
