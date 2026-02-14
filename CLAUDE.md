@@ -55,6 +55,7 @@ Build a full-featured **Python ATM (Automated Teller Machine) simulator** that r
 | Animations | Framer Motion 11 | Spring physics, AnimatePresence screen transitions, orchestrated sequences |
 | HTTP Client | Axios | Request/response interceptors for session headers, 401/503 handling |
 | State Management | React Context + useReducer | State machine pattern for linear ATM flow; no external deps needed |
+| Admin Dashboard | React 18 + Vite + TypeScript (strict) | Separate admin SPA with cookie auth, page-based navigation, CRUD views |
 | Task Queue | Celery + Redis | Async operations (PDF generation, background tasks) |
 
 ### Infrastructure
@@ -210,7 +211,7 @@ atm-simulator/
 ├── Dockerfile
 ├── docker-compose.yml           # App + PostgreSQL + (Phase 2) Redis
 ├── .env.example                 # Environment variable template
-├── frontend/                    # React web UI (v2.0)
+├── frontend/                    # React ATM web UI (v2.0)
 │   ├── package.json
 │   ├── vite.config.ts           # Vite + Vitest config with coverage thresholds
 │   ├── tsconfig.json            # TypeScript strict mode
@@ -228,6 +229,23 @@ atm-simulator/
 │       │   └── shared/          # Reusable display components
 │       ├── styles/              # CSS (metallic gradients, CRT glow, keypad)
 │       └── __tests__/           # Vitest component + hook + API tests
+├── admin/                       # React admin dashboard
+│   ├── package.json
+│   ├── vite.config.ts           # base: "/admin/", coverage thresholds
+│   ├── tsconfig.json            # TypeScript strict mode
+│   ├── eslint.config.js
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx             # Entry point
+│       ├── App.tsx              # Auth gate + page switching
+│       ├── api/                 # Axios client + 9 typed endpoint functions
+│       ├── hooks/               # useAuth, usePolling
+│       ├── components/
+│       │   ├── layout/          # AppLayout, Sidebar, TopBar
+│       │   ├── pages/           # Login, Dashboard, Accounts, AuditLogs, Maintenance
+│       │   └── shared/          # StatusBadge, StatsCard, DataTable, LoadingSpinner
+│       ├── styles/              # CSS (dashboard palette, responsive sidebar)
+│       └── __tests__/           # Vitest tests (81 tests)
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml               # Python + Frontend lint, type-check, test on every PR
@@ -352,6 +370,11 @@ atm-simulator/
 | `frontend/src/hooks/` | Frontend Engineer | — |
 | `frontend/src/styles/` | Frontend Engineer | UX Designer |
 | `frontend/src/__tests__/` | SDET | Frontend Engineer |
+| `admin/src/components/` | Frontend Engineer | Backend Engineer |
+| `admin/src/api/` | Frontend Engineer | Backend Engineer |
+| `admin/src/hooks/` | Frontend Engineer | — |
+| `admin/src/styles/` | Frontend Engineer | — |
+| `admin/src/__tests__/` | SDET | Frontend Engineer |
 | `src/atm/pdf/` | Backend Engineer | UX Designer |
 | `src/atm/utils/security.py` | Security Engineer | Backend Engineer |
 | `src/atm/db/` | Backend Engineer | Architect |
@@ -709,11 +732,12 @@ tests/
 
 #### Frontend Test Execution
 
-- **Both test suites must pass independently before any commit/push:**
-  - `pytest --cov=src/atm` — Python backend (582 tests)
-  - `npx vitest run --coverage` — React frontend (223 tests)
-- **CI runs both suites in parallel** — 5 Python jobs + 3 frontend jobs (8 total)
-- **Failing tests in either suite block merge.** No exceptions.
+- **All three test suites must pass independently before any commit/push:**
+  - `pytest --cov=src/atm` — Python backend (576 tests)
+  - `cd frontend && npx vitest run --coverage` — ATM frontend (223 tests)
+  - `cd admin && npx vitest run --coverage` — Admin dashboard (81 tests)
+- **CI runs all suites in parallel** — 5 Python jobs + 3 frontend jobs + 3 admin jobs (11 total, plus security and terraform)
+- **Failing tests in any suite block merge.** No exceptions.
 - **Frontend tests use jsdom** for component/hook tests and **Playwright** for browser E2E tests.
 - **MSW (Mock Service Worker)** mocks API responses in frontend integration tests — no dependency on a running backend.
 

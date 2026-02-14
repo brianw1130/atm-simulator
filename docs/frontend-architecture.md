@@ -282,3 +282,52 @@ Enforced in `vite.config.ts`:
 | Statements | 90% |
 | Branches | 85% |
 | Functions | 48% (v8 inflates denominator for React components) |
+
+---
+
+## Admin Dashboard
+
+The admin dashboard is a **separate React application** in the `admin/` directory. It shares the same technology stack (React + TypeScript strict + Vite + Vitest) but has a fundamentally different architecture from the ATM frontend.
+
+### Architecture Differences
+
+| Concern | ATM Frontend (`frontend/`) | Admin Dashboard (`admin/`) |
+|---|---|---|
+| **Purpose** | Skeuomorphic ATM kiosk simulation | CRUD admin panel |
+| **Authentication** | `X-Session-ID` header per request | HTTP-only `admin_session` cookie (`withCredentials: true`) |
+| **State management** | `useReducer` state machine (17 screens, 16 actions) | `useState` per page (independent CRUD views) |
+| **Navigation** | Deterministic screen flow (no URL bar — ATMs don't have them) | Sidebar page switching via `useState` |
+| **Animations** | Framer Motion (spring physics, AnimatePresence, staggered sequences) | CSS transitions only (minimal bundle) |
+| **Vite base path** | `/` (dev server port 5173) | `/admin/` (dev server port 5174) |
+| **Session expiry** | 401 interceptor dispatches `SET_SCREEN` to session timeout screen | 401 interceptor dispatches `admin:session-expired` custom event |
+
+### Directory Structure
+
+```
+admin/src/
+├── api/
+│   ├── client.ts          # Axios: baseURL="/admin/api", withCredentials=true
+│   ├── types.ts           # AdminAccount, AuditLogEntry, MaintenanceStatus
+│   └── endpoints.ts       # 9 typed endpoint functions
+├── hooks/
+│   ├── useAuth.ts         # Auth state + login/logout + session check
+│   └── usePolling.ts      # Interval-based data refresh
+├── components/
+│   ├── layout/            # AppLayout, Sidebar, TopBar
+│   ├── pages/             # LoginPage, DashboardPage, AccountsPage, AuditLogsPage, MaintenancePage
+│   └── shared/            # StatusBadge, StatsCard, DataTable, LoadingSpinner
+├── styles/
+│   └── global.css         # Dashboard CSS with variables, responsive sidebar
+└── __tests__/             # Vitest component + hook + API tests (81 tests)
+```
+
+### Coverage Thresholds (Admin)
+
+Enforced in `admin/vite.config.ts`:
+
+| Metric | Threshold |
+|---|---|
+| Lines | 90% |
+| Statements | 90% |
+| Branches | 85% |
+| Functions | 65% |

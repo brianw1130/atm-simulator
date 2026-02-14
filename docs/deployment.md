@@ -64,7 +64,7 @@ docker compose exec app alembic upgrade head
 docker compose exec app python -m scripts.seed_db
 ```
 
-The application will be available at `http://localhost:8000`. API docs are served at `http://localhost:8000/docs`.
+The application will be available at `http://localhost:8000`. The admin dashboard is at `http://localhost:8000/admin/`. API docs are served at `http://localhost:8000/docs`.
 
 To stop the services:
 
@@ -103,10 +103,26 @@ python -m scripts.seed_db
 uvicorn src.atm.main:app --reload --port 8000
 ```
 
+### Admin Dashboard Development
+
+The admin dashboard is a separate React app in the `admin/` directory:
+
+```bash
+# Start the admin dev server (port 5174)
+cd admin
+npm install
+npm run dev
+
+# Or via Docker Compose (starts alongside all services)
+docker compose up admin-frontend
+```
+
+The admin dev server runs at `http://localhost:5174/admin/` and proxies API calls to the backend on port 8000.
+
 ### Running Tests Locally
 
 ```bash
-# Run full test suite with coverage
+# Python test suite (576 tests)
 pytest --cov=src/atm --cov-report=term-missing
 
 # Run only unit tests
@@ -117,6 +133,12 @@ pytest tests/integration/
 
 # Run only E2E tests
 pytest tests/e2e/
+
+# Frontend unit tests (223 tests)
+cd frontend && npx vitest run --coverage
+
+# Admin unit tests (81 tests)
+cd admin && npx vitest run --coverage
 
 # Run a specific test file
 pytest tests/unit/services/test_auth_service.py -v
@@ -181,21 +203,27 @@ The `Dockerfile` uses a multi-stage build to produce an optimized production ima
 
 | Stage | Base Image | Purpose |
 |---|---|---|
-| `frontend-build` | `node:20-alpine` | Installs npm dependencies and runs `npm run build` to compile the React app into static assets (`frontend/dist/`). |
+| `frontend-build` | `node:20-alpine` | Installs npm dependencies and runs `npm run build` to compile the ATM React app into static assets (`frontend/dist/`). |
+| `admin-build` | `node:20-alpine` | Installs npm dependencies and runs `npm run build` to compile the Admin React app into static assets (`admin/dist/`). |
 | `base` | `python:3.12-slim` | Installs system dependencies (libpq, gcc, curl). Shared by all Python stages. |
 | `dependencies` | `base` | Installs Python dev dependencies. Used by the development stage. |
-| `production` | `base` | Installs production Python packages, copies source code and compiled frontend assets. Runs as non-root `appuser`. |
+| `production` | `base` | Installs production Python packages, copies source code and compiled frontend assets (both ATM and admin). Runs as non-root `appuser`. |
 | `development` | `dependencies` | Full source mount with hot reload (`--reload`). Used by `docker compose up`. |
 
 ### How Frontend Serving Works
 
-In production, FastAPI serves the React SPA:
-1. The `frontend-build` stage compiles React to `frontend/dist/` (HTML + JS + CSS).
-2. The `production` stage copies `frontend/dist/` into the image.
-3. `src/atm/main.py` mounts `/assets` as static files and serves `index.html` for all non-API routes.
-4. The `FRONTEND_ENABLED` env var (default `true`) controls whether static file serving is active.
+In production, FastAPI serves both React SPAs from a single container:
+1. The `frontend-build` stage compiles the ATM React app to `frontend/dist/`.
+2. The `admin-build` stage compiles the Admin React app to `admin/dist/`.
+3. The `production` stage copies both `frontend/dist/` and `admin/dist/` into the image.
+4. `src/atm/main.py` mounts the ATM frontend at `/` and the admin dashboard at `/admin/`.
+5. Admin API routes (`/admin/api/*`) take priority over the admin SPA catch-all.
+6. The `FRONTEND_ENABLED` env var (default `true`) controls whether static file serving is active.
 
-In development, a separate Vite dev server runs on port 5173 with hot module replacement, proxying API calls to the backend on port 8000.
+In development, separate Vite dev servers run for each frontend:
+- ATM frontend on port 5173 with hot module replacement
+- Admin dashboard on port 5174 with hot module replacement
+- Both proxy API calls to the backend on port 8000.
 
 ### Building for Production
 
@@ -223,12 +251,15 @@ Runs on every push to `main` and on every pull request targeting `main`.
 | **type-check** | Runs `mypy --strict src/` to enforce type annotations. |
 | **test** | Runs `pytest` with coverage against a SQLite test database. Uploads XML coverage report as artifact. |
 | **security** | Runs `pip-audit` (dependency CVEs) and `bandit -r src/` (Python SAST). |
-| **security-frontend** | Runs `npm audit --audit-level=high` on frontend dependencies. |
+| **security-frontend** | Runs `npm audit --audit-level=high` on both frontend and admin dependencies. |
 | **security-docker** | Runs Trivy filesystem scan (dependency CVEs) and IaC scan (Terraform misconfigs). |
 | **security-secrets** | Runs Gitleaks against full git history to detect leaked credentials. |
-| **frontend-lint** | Runs ESLint (`--max-warnings=0`) and TypeScript type check (`tsc --noEmit`). |
-| **frontend-test** | Runs Vitest with coverage thresholds. Uploads coverage report as artifact. |
-| **frontend-build** | Runs `npm run build` and verifies `dist/index.html` exists. |
+| **frontend-lint** | Runs ESLint (`--max-warnings=0`) and TypeScript type check (`tsc --noEmit`) on the ATM frontend. |
+| **frontend-test** | Runs Vitest with coverage thresholds on the ATM frontend. Uploads coverage report as artifact. |
+| **frontend-build** | Runs `npm run build` on the ATM frontend and verifies `dist/index.html` exists. |
+| **admin-lint** | Runs ESLint (`--max-warnings=0`) and TypeScript type check (`tsc --noEmit`) on the admin dashboard. |
+| **admin-test** | Runs Vitest with coverage thresholds on the admin dashboard. Uploads coverage report as artifact. |
+| **admin-build** | Runs `npm run build` on the admin dashboard and verifies `dist/index.html` exists. |
 | **terraform** | Runs `terraform fmt -check`, `terraform init`, and `terraform validate`. |
 
 ### CodeQL Workflow (`.github/workflows/codeql.yml`)

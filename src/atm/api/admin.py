@@ -1,11 +1,8 @@
-"""Admin panel API endpoints and template-rendered pages."""
+"""Admin panel API endpoints."""
 
-import pathlib
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,9 +20,6 @@ from src.atm.services.admin_service import (
     unfreeze_account,
     validate_admin_session,
 )
-
-_TEMPLATES_DIR = pathlib.Path(__file__).resolve().parent.parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 router = APIRouter()
 
@@ -239,77 +233,3 @@ async def maintenance_disable(admin: AdminSession) -> dict[str, str]:
         Confirmation message dict.
     """
     return await disable_maintenance_mode()
-
-
-# ---------------------------------------------------------------------------
-# Template-rendered page routes
-# ---------------------------------------------------------------------------
-
-
-@router.get("/login", response_class=HTMLResponse)
-async def admin_login_page(request: Request) -> Response:
-    """Render the admin login page.
-
-    Args:
-        request: The incoming HTTP request.
-
-    Returns:
-        Rendered login HTML page.
-    """
-    return templates.TemplateResponse("admin/login.html", {"request": request})
-
-
-@router.get("/dashboard", response_class=HTMLResponse)
-async def admin_dashboard_page(
-    request: Request,
-    db: DbSession,
-    admin_session: str | None = Cookie(default=None),
-) -> Response:
-    """Render the admin dashboard page.
-
-    Args:
-        request: The incoming HTTP request.
-        db: Database session.
-        admin_session: Session token from cookie.
-
-    Returns:
-        Rendered dashboard HTML page, or redirect to login.
-    """
-    if admin_session is None:
-        return RedirectResponse(url="/admin/login", status_code=302)
-    session_data = await validate_admin_session(admin_session)
-    if session_data is None:
-        return RedirectResponse(url="/admin/login", status_code=302)
-    accounts = await get_all_accounts(db)
-    return templates.TemplateResponse(
-        "admin/dashboard.html", {"request": request, "accounts": accounts}
-    )
-
-
-@router.get("/audit-logs", response_class=HTMLResponse)
-async def admin_audit_logs_page(
-    request: Request,
-    db: DbSession,
-    admin_session: str | None = Cookie(default=None),
-    limit: int = 100,
-    event_type: str | None = None,
-) -> Response:
-    """Render the admin audit logs page.
-
-    Args:
-        request: The incoming HTTP request.
-        db: Database session.
-        admin_session: Session token from cookie.
-        limit: Maximum number of log entries.
-        event_type: Optional event type filter.
-
-    Returns:
-        Rendered audit logs HTML page, or redirect to login.
-    """
-    if admin_session is None:
-        return RedirectResponse(url="/admin/login", status_code=302)
-    session_data = await validate_admin_session(admin_session)
-    if session_data is None:
-        return RedirectResponse(url="/admin/login", status_code=302)
-    logs = await get_audit_logs(db, limit=limit, event_type=event_type)
-    return templates.TemplateResponse("admin/audit_logs.html", {"request": request, "logs": logs})

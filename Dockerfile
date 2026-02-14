@@ -9,6 +9,17 @@ RUN npm ci --ignore-scripts
 COPY frontend/ .
 RUN npm run build
 
+# ── Admin build stage ──────────────────────────────────────────────
+FROM node:20-alpine AS admin-build
+
+WORKDIR /admin
+
+COPY admin/package.json admin/package-lock.json ./
+RUN npm ci --ignore-scripts
+
+COPY admin/ .
+RUN npm run build
+
 # ── Python base stage ─────────────────────────────────────────────
 FROM python:3.12-slim AS base
 
@@ -41,8 +52,9 @@ COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/
 
-# Copy built frontend assets from the Node.js stage
+# Copy built frontend assets from the Node.js stages
 COPY --from=frontend-build /frontend/dist/ frontend/dist/
+COPY --from=admin-build /admin/dist/ admin/dist/
 
 RUN pip install --no-cache-dir .
 

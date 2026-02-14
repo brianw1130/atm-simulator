@@ -16,7 +16,7 @@ Built with **FastAPI**, **SQLAlchemy 2.0**, **PostgreSQL**, **React 18** (skeuom
 - **PIN Management** — Secure PIN change with complexity validation
 - **Session Timeout** — 2-minute idle timer with 30-second countdown warning
 - **Audit Logging** — Every authentication attempt and transaction is logged
-- **Admin Panel** — Account management, maintenance mode, audit log viewer
+- **Admin Dashboard** — React admin panel with account management, freeze/unfreeze, maintenance mode toggle, and audit log viewer
 
 ## Quick Start
 
@@ -44,9 +44,11 @@ docker compose exec app python -m scripts.seed_db
 
 **Web UI:** Open `http://localhost:8000` in your browser to use the ATM.
 
+**Admin Dashboard:** Open `http://localhost:8000/admin/` for the admin panel (default credentials: `admin` / `admin123`).
+
 **API Docs:** Interactive Swagger docs at `http://localhost:8000/docs`.
 
-**Development mode:** The Vite dev server runs at `http://localhost:5173` with hot module replacement.
+**Development mode:** The ATM Vite dev server runs at `http://localhost:5173` and the admin dev server at `http://localhost:5174` with hot module replacement.
 
 ### Run the Terminal UI
 
@@ -92,11 +94,14 @@ npm run dev
 ### Running Tests
 
 ```bash
-# Python test suite (582 tests)
+# Python test suite (576 tests)
 pytest --cov=src/atm --cov-report=term-missing
 
 # Frontend unit tests (223 tests)
 cd frontend && npx vitest run --coverage
+
+# Admin unit tests (81 tests)
+cd admin && npx vitest run --coverage
 
 # Frontend browser E2E tests (36 tests)
 cd frontend && npx playwright test
@@ -104,11 +109,13 @@ cd frontend && npx playwright test
 # Type checking
 mypy src/
 cd frontend && npx tsc --noEmit
+cd admin && npx tsc --noEmit
 
 # Linting
 ruff check src/ tests/
 ruff format --check src/ tests/
 cd frontend && npx eslint . --max-warnings=0
+cd admin && npx eslint . --max-warnings=0
 ```
 
 ### Coverage Requirements
@@ -136,7 +143,7 @@ atm-simulator/
 │   ├── ui/               # Textual terminal UI
 │   ├── pdf/              # PDF statement generation
 │   └── utils/            # Security, formatting utilities
-├── frontend/             # React web UI (v2.0)
+├── frontend/             # React ATM web UI (v2.0)
 │   ├── src/
 │   │   ├── components/   # ATM housing + 17 screen components
 │   │   ├── state/        # useReducer state machine (17 screens, 16 actions)
@@ -144,6 +151,12 @@ atm-simulator/
 │   │   ├── hooks/        # useATMContext, useIdleTimer
 │   │   └── styles/       # CSS (metallic gradients, CRT glow, keypad)
 │   └── __tests__/        # Vitest + Playwright tests
+├── admin/                # React admin dashboard
+│   ├── src/
+│   │   ├── components/   # Layout, pages, shared components
+│   │   ├── api/          # Axios client + typed endpoint functions
+│   │   └── hooks/        # useAuth, usePolling
+│   └── __tests__/        # Vitest tests (81 tests)
 ├── tests/                # Python test suite (unit, integration, e2e)
 ├── infra/                # Terraform IaC for AWS deployment
 ├── alembic/              # Database migrations
@@ -165,9 +178,11 @@ atm-simulator/
 
 **Frontend:** React 18 / TypeScript (strict) / Vite / Framer Motion / Axios
 
-**Testing:** pytest (582 tests) / Vitest (223 tests) / Playwright (36 tests)
+**Admin:** React 18 / TypeScript (strict) / Vite / Axios
 
-**Infrastructure:** Docker / GitHub Actions (13 CI jobs) / Terraform / AWS (ECS Fargate)
+**Testing:** pytest (576 tests) / Vitest (304 tests) / Playwright (36 tests)
+
+**Infrastructure:** Docker / GitHub Actions (16 CI jobs) / Terraform / AWS (ECS Fargate)
 
 **Security:** CodeQL / Bandit / pip-audit / npm audit / Trivy / Gitleaks / Dependabot
 

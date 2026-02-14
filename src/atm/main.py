@@ -54,7 +54,7 @@ def create_app() -> FastAPI:
     if settings.is_development:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["http://localhost:5173"],
+            allow_origins=["http://localhost:5173", "http://localhost:5174"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware)
 
     _register_routers(app)
+    _mount_admin_frontend(app)
     _mount_frontend(app)
 
     return app
@@ -93,6 +94,45 @@ def _register_routers(app: FastAPI) -> None:
     from src.atm.api.admin import router as admin_router
 
     app.include_router(admin_router, prefix="/admin", tags=["Admin"])
+
+
+def _mount_admin_frontend(app: FastAPI) -> None:
+    """Mount the admin React SPA static files and catch-all route.
+
+    In production, the admin build output lives at ``admin/dist/``.
+    If the directory does not exist (e.g. in tests or when ``frontend_enabled``
+    is ``False``), this function is a no-op.
+
+    Must be called after ``_register_routers()`` so that ``/admin/api/*`` routes
+    take priority over the SPA catch-all.
+
+    Args:
+        app: The FastAPI application instance.
+    """
+    if not settings.frontend_enabled:
+        return  # pragma: no cover
+
+    admin_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "admin" / "dist"
+    if not admin_dir.exists():
+        return
+
+    admin_assets = admin_dir / "assets"
+    if admin_assets.exists():
+        app.mount(
+            "/admin/assets",
+            StaticFiles(directory=str(admin_assets)),
+            name="admin-static-assets",
+        )
+
+    admin_index = admin_dir / "index.html"
+
+    @app.get("/admin/{path:path}", response_class=FileResponse, include_in_schema=False)
+    async def serve_admin_spa(path: str) -> FileResponse:
+        """Serve admin SPA — static files or fall back to index.html."""
+        file_path = admin_dir / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(admin_index))
 
 
 def _mount_frontend(app: FastAPI) -> None:

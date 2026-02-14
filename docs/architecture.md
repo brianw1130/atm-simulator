@@ -36,6 +36,34 @@ the same FastAPI backend via REST.
 └─────────────────────────────────────────────────┘
 ```
 
+## Admin Dashboard
+
+The ATM Simulator includes a separate React admin dashboard served at `/admin/`. Unlike the ATM
+frontend (which uses a state machine for linear screen flow), the admin dashboard uses standard
+page-based navigation with independent CRUD views.
+
+**Key differences from the ATM frontend:**
+
+| Aspect | ATM Frontend | Admin Dashboard |
+|---|---|---|
+| Auth mechanism | `X-Session-ID` header | HTTP-only `admin_session` cookie |
+| State management | `useReducer` state machine (17 screens) | `useState` per page |
+| Navigation | Deterministic screen flow | Sidebar page switching |
+| Animations | Framer Motion spring physics | CSS transitions only |
+| Vite base path | `/` (port 5173) | `/admin/` (port 5174) |
+
+**Pages:**
+- **Login** — Username/password form with cookie-based session
+- **Dashboard** — Stats cards (accounts, activity, maintenance status) with 30s auto-refresh
+- **Accounts** — Table with freeze/unfreeze actions per account
+- **Audit Logs** — Filterable log table with expandable JSON details
+- **Maintenance** — Toggle ATM maintenance mode on/off with optional reason
+
+The admin API endpoints live at `/admin/api/*` and are registered before the SPA catch-all
+route, ensuring API calls are never intercepted by the frontend's `index.html` fallback.
+
+---
+
 ## Technology Decisions
 
 ### ADR-001: FastAPI as Web Framework

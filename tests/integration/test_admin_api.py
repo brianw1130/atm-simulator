@@ -1,7 +1,7 @@
 """Integration tests for admin API endpoints.
 
 Tests cover: login, logout, account listing, freeze/unfreeze, audit logs,
-and template-rendered pages (login, dashboard, audit logs).
+and maintenance mode.
 """
 
 import pytest
@@ -277,84 +277,3 @@ class TestListAuditLogs:
         """Unauthenticated request returns 401."""
         resp = await client.get("/admin/api/audit-logs")
         assert resp.status_code == 401
-
-
-# ===========================================================================
-# GET /admin/login (HTML page)
-# ===========================================================================
-
-
-class TestAdminLoginPage:
-    async def test_returns_html(self, client: AsyncClient, db_session: AsyncSession) -> None:
-        """GET /admin/login returns an HTML page."""
-        resp = await client.get("/admin/login")
-        assert resp.status_code == 200
-        assert "text/html" in resp.headers["content-type"]
-
-
-# ===========================================================================
-# GET /admin/dashboard (HTML page)
-# ===========================================================================
-
-
-class TestAdminDashboardPage:
-    async def test_with_valid_cookie_returns_html(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
-        """Authenticated admin sees the dashboard HTML with accounts."""
-        await _create_admin(db_session)
-        await _seed_account(db_session)
-        cookies = await _login(client)
-
-        resp = await client.get("/admin/dashboard", cookies=cookies)
-        assert resp.status_code == 200
-        assert "text/html" in resp.headers["content-type"]
-        # Page should contain account data
-        assert "1000-0001-0001" in resp.text
-
-    async def test_without_cookie_redirects_to_login(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
-        """No cookie redirects to /admin/login."""
-        resp = await client.get("/admin/dashboard", follow_redirects=False)
-        assert resp.status_code == 302
-        assert "/admin/login" in resp.headers["location"]
-
-    async def test_with_invalid_cookie_redirects_to_login(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
-        """An expired/invalid cookie redirects to /admin/login."""
-        resp = await client.get(
-            "/admin/dashboard",
-            cookies={"admin_session": "bogus-token"},
-            follow_redirects=False,
-        )
-        assert resp.status_code == 302
-        assert "/admin/login" in resp.headers["location"]
-
-
-# ===========================================================================
-# GET /admin/audit-logs (HTML page)
-# ===========================================================================
-
-
-class TestAdminAuditLogsPage:
-    async def test_with_valid_cookie_returns_html(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
-        """Authenticated admin sees the audit logs HTML page."""
-        await _create_admin(db_session)
-        await _seed_audit_logs(db_session)
-        cookies = await _login(client)
-
-        resp = await client.get("/admin/audit-logs", cookies=cookies)
-        assert resp.status_code == 200
-        assert "text/html" in resp.headers["content-type"]
-
-    async def test_without_cookie_redirects_to_login(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
-        """No cookie redirects to /admin/login."""
-        resp = await client.get("/admin/audit-logs", follow_redirects=False)
-        assert resp.status_code == 302
-        assert "/admin/login" in resp.headers["location"]
