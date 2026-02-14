@@ -1,6 +1,7 @@
 """FastAPI application factory and startup configuration."""
 
 import logging
+import os
 import pathlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -140,13 +141,14 @@ def _mount_admin_frontend(app: FastAPI) -> None:
         )
 
     admin_index = admin_dir / "index.html"
+    admin_dir_prefix = os.path.realpath(str(admin_dir)) + os.sep
 
     @app.get("/admin/{path:path}", response_class=FileResponse, include_in_schema=False)
     async def serve_admin_spa(path: str) -> FileResponse:
         """Serve admin SPA — static files or fall back to index.html."""
-        file_path = (admin_dir / path).resolve()
-        if file_path.is_relative_to(admin_dir) and file_path.is_file():
-            return FileResponse(str(file_path))
+        real = os.path.realpath(os.path.join(str(admin_dir), path))
+        if real.startswith(admin_dir_prefix) and os.path.isfile(real):
+            return FileResponse(real)
         return FileResponse(str(admin_index))
 
 
@@ -172,6 +174,7 @@ def _mount_frontend(app: FastAPI) -> None:
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="static-assets")
 
     index_html = frontend_dir / "index.html"
+    frontend_dir_prefix = os.path.realpath(str(frontend_dir)) + os.sep
 
     @app.get("/", response_class=FileResponse, include_in_schema=False)
     async def serve_spa_root() -> FileResponse:
@@ -181,9 +184,9 @@ def _mount_frontend(app: FastAPI) -> None:
     @app.get("/{path:path}", response_class=FileResponse, include_in_schema=False)
     async def serve_spa_fallback(path: str) -> FileResponse:
         """Serve static files or fall back to index.html for client-side routing."""
-        file_path = (frontend_dir / path).resolve()
-        if file_path.is_relative_to(frontend_dir) and file_path.is_file():
-            return FileResponse(str(file_path))
+        real = os.path.realpath(os.path.join(str(frontend_dir), path))
+        if real.startswith(frontend_dir_prefix) and os.path.isfile(real):
+            return FileResponse(real)
         return FileResponse(str(index_html))
 
 

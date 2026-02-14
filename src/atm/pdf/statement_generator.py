@@ -11,8 +11,8 @@ Generates professional account statements with:
     - Summary totals (total debits, total credits)
 """
 
+import os
 from datetime import UTC, datetime
-from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -61,11 +61,11 @@ def generate_statement_pdf(
         The file_path where the PDF was saved.
     """
     # Resolve and validate path to prevent directory traversal
-    resolved = Path(file_path).resolve()
-    resolved.parent.mkdir(parents=True, exist_ok=True)
+    real_path = os.path.realpath(file_path)
+    os.makedirs(os.path.dirname(real_path), exist_ok=True)
 
     doc = SimpleDocTemplate(
-        str(resolved),
+        real_path,
         pagesize=letter,
         leftMargin=0.75 * inch,
         rightMargin=0.75 * inch,
