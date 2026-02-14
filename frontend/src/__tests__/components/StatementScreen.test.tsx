@@ -9,11 +9,13 @@ import { StatementScreen } from "../../components/screens/StatementScreen";
 
 vi.mock("../../api/endpoints", () => ({
   generateStatement: vi.fn(),
+  downloadStatement: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { generateStatement } from "../../api/endpoints";
+import { generateStatement, downloadStatement } from "../../api/endpoints";
 
 const mockGenerateStatement = vi.mocked(generateStatement);
+const mockDownloadStatement = vi.mocked(downloadStatement);
 
 function TestProvider({
   children,
@@ -151,9 +153,7 @@ describe("StatementScreen", () => {
     });
   });
 
-  it("opens download URL on download click", async () => {
-    const windowOpen = vi.spyOn(window, "open").mockImplementation(() => null);
-
+  it("downloads PDF when download button is clicked", async () => {
     mockGenerateStatement.mockResolvedValue({
       file_path: "/app/statements/stmt_2024.pdf",
       period: "Jan 1 - Jan 7, 2024",
@@ -174,17 +174,14 @@ describe("StatementScreen", () => {
       await StatementScreen.handleGenerate(7);
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId("download-btn")).toBeInTheDocument();
-    });
+    // No auto-download on generation
+    expect(mockDownloadStatement).not.toHaveBeenCalled();
 
+    // Manual download button works
     await user.click(screen.getByTestId("download-btn"));
-    expect(windowOpen).toHaveBeenCalledWith(
-      "/api/v1/statements/download/stmt_2024.pdf",
-      "_blank",
+    expect(mockDownloadStatement).toHaveBeenCalledWith(
+      "/app/statements/stmt_2024.pdf",
     );
-
-    windowOpen.mockRestore();
   });
 
   it("shows error on generation failure", async () => {

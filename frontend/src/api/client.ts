@@ -21,7 +21,15 @@ apiClient.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status === 401) {
-        window.dispatchEvent(new CustomEvent("atm:session-expired"));
+        // Only treat as session expiry for authenticated endpoints.
+        // Login and PIN change return 401 for wrong credentials — those
+        // are handled by each screen's own catch block.
+        const url = error.config?.url ?? "";
+        const isAuthEndpoint =
+          url.includes("/auth/login") || url.includes("/auth/pin/change");
+        if (!isAuthEndpoint) {
+          window.dispatchEvent(new CustomEvent("atm:session-expired"));
+        }
       }
       if (error.response.status === 503) {
         const reason =

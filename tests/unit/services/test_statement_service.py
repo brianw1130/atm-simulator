@@ -192,12 +192,11 @@ class TestGenerateStatement:
             await generate_statement(db_session, 999)
 
     @patch("src.atm.services.statement_service.generate_statement_pdf")
-    async def test_file_path_contains_masked_account(self, mock_pdf, db_session: AsyncSession):
+    async def test_file_path_contains_period(self, mock_pdf, db_session: AsyncSession):
         account = await _seed_account_with_customer(db_session)
-        result = await generate_statement(db_session, account.id)
+        result = await generate_statement(db_session, account.id, days=7)
 
-        assert "****" in result["file_path"]
-        assert result["file_path"].endswith(".pdf")
+        assert result["file_path"].endswith(f"statement_{account.id}_last_7_days.pdf")
 
     @patch("src.atm.services.statement_service.generate_statement_pdf")
     async def test_pdf_generator_called_with_account_info(self, mock_pdf, db_session: AsyncSession):

@@ -78,13 +78,14 @@ describe("API client", () => {
     expect(result.headers["X-Session-ID"]).toBeUndefined();
   });
 
-  it("dispatches session-expired event on 401 response", async () => {
+  it("dispatches session-expired event on 401 for non-auth endpoints", async () => {
     const { default: apiClient } = await import("../../api/client");
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
     const handler = getResponseHandler(apiClient);
     const error = {
       isAxiosError: true,
+      config: { url: "/accounts/" },
       response: { status: 401, data: {} },
     } as unknown as AxiosError;
 
@@ -94,6 +95,44 @@ describe("API client", () => {
     expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
     const event = dispatchSpy.mock.calls[0]?.[0] as CustomEvent;
     expect(event.type).toBe("atm:session-expired");
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("does not dispatch session-expired on 401 from /auth/login", async () => {
+    const { default: apiClient } = await import("../../api/client");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    const handler = getResponseHandler(apiClient);
+    const error = {
+      isAxiosError: true,
+      config: { url: "/auth/login" },
+      response: { status: 401, data: { detail: "Invalid PIN" } },
+    } as unknown as AxiosError;
+
+    vi.spyOn(axios, "isAxiosError").mockReturnValue(true);
+
+    await expect(handler.rejected(error)).rejects.toBe(error);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("does not dispatch session-expired on 401 from /auth/pin/change", async () => {
+    const { default: apiClient } = await import("../../api/client");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    const handler = getResponseHandler(apiClient);
+    const error = {
+      isAxiosError: true,
+      config: { url: "/auth/pin/change" },
+      response: { status: 401, data: { detail: "Incorrect current PIN" } },
+    } as unknown as AxiosError;
+
+    vi.spyOn(axios, "isAxiosError").mockReturnValue(true);
+
+    await expect(handler.rejected(error)).rejects.toBe(error);
+    expect(dispatchSpy).not.toHaveBeenCalled();
 
     dispatchSpy.mockRestore();
   });

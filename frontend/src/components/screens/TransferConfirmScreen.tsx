@@ -58,7 +58,10 @@ export function TransferConfirmScreen() {
       <div className="screen-content__header">
         <h2>Confirm Transfer</h2>
       </div>
-      <div className="screen-content__body">
+      <div
+        className="screen-content__body"
+        style={{ justifyContent: "flex-start", paddingTop: "12px" }}
+      >
         <div className="confirm-details" data-testid="confirm-details">
           <div className="confirm-row">
             <span>From:</span>

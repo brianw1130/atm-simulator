@@ -154,10 +154,11 @@ async def generate_statement(
     # Format period string
     period_str = f"{range_start.strftime('%b %d, %Y')} - {range_end.strftime('%b %d, %Y')}"
 
-    # Generate file path
-    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    # Generate file path (use account ID — masked numbers contain asterisks
+    # that are rejected by the download endpoint's safe-filename regex)
     masked = mask_account_number(account.account_number)
-    filename = f"statement_{masked}_{timestamp}.pdf"
+    period_days = days if days is not None else 30
+    filename = f"statement_{account.id}_last_{period_days}_days.pdf"
     file_path = f"{settings.statement_output_dir}/{filename}"
 
     # Generate PDF

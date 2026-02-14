@@ -101,3 +101,19 @@ export function getStatementDownloadUrl(filePath: string): string {
   const filename = filePath.split("/").pop() ?? "";
   return `/api/v1/statements/download/${filename}`;
 }
+
+export async function downloadStatement(filePath: string): Promise<void> {
+  const filename = filePath.split("/").pop() ?? "statement.pdf";
+  const response = await apiClient.get(
+    `/statements/download/${filename}`,
+    { responseType: "blob" },
+  );
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

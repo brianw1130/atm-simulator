@@ -1,6 +1,6 @@
 import { useState, useCallback, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
-import { generateStatement } from "../../api/endpoints";
+import { generateStatement, downloadStatement } from "../../api/endpoints";
 import type { StatementResponse } from "../../api/types";
 import axios from "axios";
 
@@ -42,8 +42,9 @@ export function StatementScreen() {
 
   const handleDownload = useCallback(() => {
     if (!result) return;
-    const filename = result.file_path.split("/").pop() ?? "";
-    window.open(`/api/v1/statements/download/${filename}`, "_blank");
+    downloadStatement(result.file_path).catch(() => {
+      /* ignore retry errors */
+    });
   }, [result]);
 
   const selectedAccount = state.accounts.find(
@@ -102,7 +103,10 @@ export function StatementScreen() {
           </p>
         )}
       </div>
-      <div className="screen-content__body">
+      <div
+        className="screen-content__body"
+        style={{ justifyContent: "flex-start", paddingTop: "50px" }}
+      >
         <p className="screen-text-dim">Select period using side buttons</p>
         {error && (
           <p className="screen-error" data-testid="statement-error">
