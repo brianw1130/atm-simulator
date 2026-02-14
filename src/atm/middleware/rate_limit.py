@@ -37,7 +37,7 @@ def get_card_number_or_ip(request: Request) -> str:
             if isinstance(card_number, str) and card_number:
                 return card_number
     except (json.JSONDecodeError, AttributeError, TypeError):
-        pass
+        pass  # Fall through to IP-based rate limiting when body parsing fails
     return get_remote_address(request)
 
 

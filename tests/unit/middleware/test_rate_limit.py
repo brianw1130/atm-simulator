@@ -82,7 +82,7 @@ def test_limiter_would_enable_in_production() -> None:
     prod_limiter = Limiter(
         key_func=lambda _: "test",
         default_limits=["60/minute"],
-        enabled=("production" == "production"),
+        enabled=True,
         storage_uri="memory://",
     )
     assert prod_limiter.enabled

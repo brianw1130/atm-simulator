@@ -144,8 +144,8 @@ def _mount_admin_frontend(app: FastAPI) -> None:
     @app.get("/admin/{path:path}", response_class=FileResponse, include_in_schema=False)
     async def serve_admin_spa(path: str) -> FileResponse:
         """Serve admin SPA — static files or fall back to index.html."""
-        file_path = admin_dir / path
-        if file_path.exists() and file_path.is_file():
+        file_path = (admin_dir / path).resolve()
+        if file_path.is_relative_to(admin_dir) and file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(admin_index))
 
@@ -181,8 +181,8 @@ def _mount_frontend(app: FastAPI) -> None:
     @app.get("/{path:path}", response_class=FileResponse, include_in_schema=False)
     async def serve_spa_fallback(path: str) -> FileResponse:
         """Serve static files or fall back to index.html for client-side routing."""
-        file_path = frontend_dir / path
-        if file_path.exists() and file_path.is_file():
+        file_path = (frontend_dir / path).resolve()
+        if file_path.is_relative_to(frontend_dir) and file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(index_html))
 

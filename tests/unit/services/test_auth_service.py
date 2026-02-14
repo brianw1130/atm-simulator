@@ -101,7 +101,7 @@ async def clear_sessions():
 
 class TestAuthenticate:
     async def test_successful_login(self, db_session: AsyncSession):
-        _customer, _account, _card = await _seed_card(db_session)
+        await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
 
         assert result["session_id"]
@@ -273,7 +273,7 @@ class TestLogout:
 
 class TestChangePin:
     async def test_successful_pin_change(self, db_session: AsyncSession):
-        _customer, _account, _card = await _seed_card(db_session)
+        await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 
@@ -281,7 +281,7 @@ class TestChangePin:
         assert response["message"] == "PIN changed successfully"
 
     async def test_new_pin_works_after_change(self, db_session: AsyncSession):
-        _customer, _account, _card = await _seed_card(db_session)
+        await _seed_card(db_session)
         result = await authenticate(db_session, "4000-0001-0001", TEST_PIN)
         session_id = result["session_id"]
 

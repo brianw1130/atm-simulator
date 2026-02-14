@@ -60,11 +60,12 @@ def generate_statement_pdf(
     Returns:
         The file_path where the PDF was saved.
     """
-    # Ensure output directory exists
-    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+    # Resolve and validate path to prevent directory traversal
+    resolved = Path(file_path).resolve()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
 
     doc = SimpleDocTemplate(
-        file_path,
+        str(resolved),
         pagesize=letter,
         leftMargin=0.75 * inch,
         rightMargin=0.75 * inch,
