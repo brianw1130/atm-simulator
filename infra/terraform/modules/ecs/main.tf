@@ -29,6 +29,9 @@ locals {
     { name = "STATEMENT_OUTPUT_DIR", value = "/app/statements" },
     { name = "LOG_LEVEL", value = var.log_level },
     { name = "ENVIRONMENT", value = "production" },
+    { name = "S3_BUCKET_NAME", value = var.s3_statements_bucket_name },
+    { name = "AWS_REGION", value = var.aws_region },
+    { name = "SEED_SNAPSHOT_S3_KEY", value = var.seed_snapshot_s3_key },
   ]
 
   common_secrets = [

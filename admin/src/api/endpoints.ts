@@ -8,6 +8,7 @@ import type {
   AuditLogEntry,
   CustomerCreateData,
   CustomerUpdateData,
+  DashboardStats,
   MaintenanceStatus,
 } from "./types";
 
@@ -26,6 +27,14 @@ export async function login(
 
 export async function logout(): Promise<{ message: string }> {
   const response = await adminClient.post<{ message: string }>("/logout");
+  return response.data;
+}
+
+// --- Dashboard ---
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const response =
+    await adminClient.get<DashboardStats>("/dashboard-stats");
   return response.data;
 }
 

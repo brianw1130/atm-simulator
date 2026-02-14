@@ -57,6 +57,23 @@ async def seed_database(
             await import_snapshot(session, data, conflict_strategy="skip")
             return
         logger.warning("Snapshot path %s does not exist, falling back to default seed.", path)
+
+    # S3 snapshot key (configured via SEED_SNAPSHOT_S3_KEY env var)
+    if settings.seed_snapshot_s3_key:
+        try:
+            from src.atm.services.s3_client import download_snapshot
+
+            s3_data = download_snapshot(settings.seed_snapshot_s3_key)
+            if s3_data:
+                logger.info("Seeding database from S3: %s", settings.seed_snapshot_s3_key)
+                from src.atm.services.admin_service import import_snapshot
+
+                await import_snapshot(session, s3_data, conflict_strategy="skip")
+                return
+            logger.warning("Failed to download S3 snapshot, falling back to defaults.")
+        except Exception:
+            logger.warning("S3 seed failed, falling back to defaults.", exc_info=True)
+
     # Seed admin user independently (safe to run on existing databases)
     existing_admin = await session.execute(select(AdminUser).limit(1))
     if existing_admin.scalars().first() is None:

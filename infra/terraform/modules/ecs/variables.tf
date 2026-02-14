@@ -146,6 +146,18 @@ variable "s3_statements_bucket_arn" {
   type        = string
 }
 
+variable "s3_statements_bucket_name" {
+  description = "Name of the S3 bucket for statements and snapshots"
+  type        = string
+  default     = ""
+}
+
+variable "seed_snapshot_s3_key" {
+  description = "S3 key to seed database from on startup (empty = use defaults)"
+  type        = string
+  default     = ""
+}
+
 # Deployment
 variable "deployment_minimum_healthy_percent" {
   description = "Minimum healthy percent during deployment (0 allows downtime, 100 for zero-downtime)"

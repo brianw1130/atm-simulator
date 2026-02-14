@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
@@ -78,3 +79,63 @@ class TestSeedFromSnapshot:
         result = await db_session.execute(select(Customer))
         customers = result.scalars().all()
         assert len(customers) == 3
+
+
+class TestSeedFromS3:
+    async def test_seed_from_s3_key(self, db_session: AsyncSession) -> None:
+        """Seeding from a valid S3 snapshot key imports entities."""
+        s3_snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "S3Seed",
+                    "last_name": "User",
+                    "date_of_birth": "1990-01-01",
+                    "email": "s3-seed@example.com",
+                    "is_active": True,
+                    "accounts": [],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        with (
+            patch("src.atm.db.seed.settings") as mock_settings,
+            patch(
+                "src.atm.services.s3_client.download_snapshot", return_value=s3_snapshot
+            ) as mock_dl,
+        ):
+            mock_settings.seed_snapshot_s3_key = "snapshots/test.json"
+            mock_settings.seed_snapshot_path = ""
+            mock_settings.pin_pepper = "test-pepper"
+            await seed_database(db_session)
+            await db_session.commit()
+
+            mock_dl.assert_called_once_with("snapshots/test.json")
+
+        result = await db_session.execute(
+            select(Customer).where(Customer.email == "s3-seed@example.com")
+        )
+        customer = result.scalars().first()
+        assert customer is not None
+        assert customer.first_name == "S3Seed"
+
+    async def test_seed_s3_download_failure_falls_back(self, db_session: AsyncSession) -> None:
+        """When S3 download returns None, seed falls back to hardcoded defaults."""
+        with (
+            patch("src.atm.db.seed.settings") as mock_settings,
+            patch("src.atm.services.s3_client.download_snapshot", return_value=None),
+        ):
+            mock_settings.seed_snapshot_s3_key = "snapshots/missing.json"
+            mock_settings.seed_snapshot_path = ""
+            mock_settings.pin_pepper = "test-pepper"
+            await seed_database(db_session)
+            await db_session.commit()
+
+        # Should have fallen back to default seed (Alice, Bob, Charlie)
+        result = await db_session.execute(
+            select(Customer).where(Customer.email == "alice.johnson@example.com")
+        )
+        customer = result.scalars().first()
+        assert customer is not None

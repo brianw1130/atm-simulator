@@ -5,7 +5,7 @@ import secrets
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -100,16 +100,86 @@ async def admin_logout(token: str) -> bool:
     return deleted > 0
 
 
-async def get_all_accounts(session: AsyncSession) -> list[dict[str, Any]]:
-    """Get all accounts with customer info.
+async def get_dashboard_stats(session: AsyncSession) -> dict[str, Any]:
+    """Aggregate stats for the admin dashboard.
+
+    Uses underlying tables for aggregate queries to avoid ORM mapper hooks
+    (e.g. the test conftest's ``do_orm_execute`` listener that adds
+    ``selectinload`` — invalid for column-level aggregate queries).
 
     Args:
         session: Async database session.
 
     Returns:
+        Dict with customer counts, account counts, and total balance.
+    """
+    ct = Customer.__table__
+    at = Account.__table__
+
+    # Customer counts
+    total_customers_result = await session.execute(select(func.count()).select_from(ct))
+    total_customers: int = total_customers_result.scalar() or 0
+
+    active_customers_result = await session.execute(
+        select(func.count()).select_from(ct).where(ct.c.is_active == True)  # noqa: E712
+    )
+    active_customers: int = active_customers_result.scalar() or 0
+
+    # Account counts by status
+    total_accounts_result = await session.execute(select(func.count()).select_from(at))
+    total_accounts: int = total_accounts_result.scalar() or 0
+
+    active_accounts_result = await session.execute(
+        select(func.count()).select_from(at).where(at.c.status == AccountStatus.ACTIVE)
+    )
+    active_accounts: int = active_accounts_result.scalar() or 0
+
+    frozen_accounts_result = await session.execute(
+        select(func.count()).select_from(at).where(at.c.status == AccountStatus.FROZEN)
+    )
+    frozen_accounts: int = frozen_accounts_result.scalar() or 0
+
+    closed_accounts_result = await session.execute(
+        select(func.count()).select_from(at).where(at.c.status == AccountStatus.CLOSED)
+    )
+    closed_accounts: int = closed_accounts_result.scalar() or 0
+
+    # Total balance across active accounts
+    total_balance_result = await session.execute(
+        select(func.coalesce(func.sum(at.c.balance_cents), 0))
+        .select_from(at)
+        .where(at.c.status == AccountStatus.ACTIVE)
+    )
+    total_balance_cents: int = total_balance_result.scalar() or 0
+    total_balance_formatted = f"${total_balance_cents / 100:,.2f}"
+
+    return {
+        "total_customers": total_customers,
+        "active_customers": active_customers,
+        "total_accounts": total_accounts,
+        "active_accounts": active_accounts,
+        "frozen_accounts": frozen_accounts,
+        "closed_accounts": closed_accounts,
+        "total_balance_formatted": total_balance_formatted,
+    }
+
+
+async def get_all_accounts(
+    session: AsyncSession,
+    customer_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """Get all accounts with customer info.
+
+    Args:
+        session: Async database session.
+        customer_id: Optional filter to return only accounts for this customer.
+
+    Returns:
         List of account dicts with customer name, balance, and status.
     """
     stmt = select(Account).options(selectinload(Account.customer)).order_by(Account.id)
+    if customer_id is not None:
+        stmt = stmt.where(Account.customer_id == customer_id)
     result = await session.execute(stmt)
     accounts = result.scalars().all()
     return [
@@ -175,6 +245,7 @@ async def get_audit_logs(
     session: AsyncSession,
     limit: int = 100,
     event_type: str | None = None,
+    account_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """Get recent audit log entries.
 
@@ -182,6 +253,7 @@ async def get_audit_logs(
         session: Async database session.
         limit: Maximum number of entries to return.
         event_type: Optional filter by event type.
+        account_id: Optional filter by account ID.
 
     Returns:
         List of audit log dicts.
@@ -189,6 +261,8 @@ async def get_audit_logs(
     stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
     if event_type:
         stmt = stmt.where(AuditLog.event_type == AuditEventType(event_type))
+    if account_id is not None:
+        stmt = stmt.where(AuditLog.account_id == account_id)
     result = await session.execute(stmt)
     logs = result.scalars().all()
     return [

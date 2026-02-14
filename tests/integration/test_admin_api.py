@@ -1,8 +1,11 @@
 """Integration tests for admin API endpoints.
 
 Tests cover: login, logout, account listing, freeze/unfreeze, audit logs,
-maintenance mode, customer CRUD, account CRUD, and PIN reset.
+maintenance mode, customer CRUD, account CRUD, PIN reset, export/import,
+and dashboard stats.
 """
+
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -787,9 +790,7 @@ class TestExportEndpoint:
 
 
 class TestImportEndpoint:
-    async def test_import_success(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_import_success(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """POST /api/import with valid JSON creates entities."""
         await _create_admin(db_session)
         cookies = await _login(client)
@@ -912,3 +913,159 @@ class TestImportEndpoint:
         data = import_resp.json()
         assert data["customers_skipped"] >= 1
         assert data["customers_created"] == 0
+
+    async def test_export_calls_s3_upload(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Export endpoint also calls upload_snapshot for S3 persistence."""
+        await _create_admin(db_session)
+        await _seed_account(db_session)
+        cookies = await _login(client)
+
+        with patch("src.atm.services.s3_client.upload_snapshot") as mock_upload:
+            mock_upload.return_value = True
+            resp = await client.get("/admin/api/export", cookies=cookies)
+
+        assert resp.status_code == 200
+        mock_upload.assert_called_once()
+        args = mock_upload.call_args
+        assert args[0][0]["version"] == "1.0"  # snapshot dict
+        assert args[0][1].startswith("atm-snapshot-")  # filename
+
+    async def test_export_succeeds_when_s3_fails(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Export still returns 200 when S3 upload raises an exception."""
+        await _create_admin(db_session)
+        await _seed_account(db_session)
+        cookies = await _login(client)
+
+        with patch(
+            "src.atm.services.s3_client.upload_snapshot",
+            side_effect=RuntimeError("S3 unavailable"),
+        ):
+            resp = await client.get("/admin/api/export", cookies=cookies)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["version"] == "1.0"
+
+
+# ===========================================================================
+# GET /admin/api/dashboard-stats
+# ===========================================================================
+
+
+class TestDashboardStats:
+    async def test_returns_stats(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Dashboard stats endpoint returns correct counts."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(
+            db_session, first_name="Alice", email="stats@example.com"
+        )
+        await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8001-0001",
+            balance_cents=100_000,
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.get("/admin/api/dashboard-stats", cookies=cookies)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_customers"] >= 1
+        assert data["active_customers"] >= 1
+        assert data["total_accounts"] >= 1
+        assert data["active_accounts"] >= 1
+        assert "total_balance_formatted" in data
+
+    async def test_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated request returns 401."""
+        resp = await client.get("/admin/api/dashboard-stats")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# GET /admin/api/accounts?customer_id=
+# ===========================================================================
+
+
+class TestListAccountsFilter:
+    async def test_filter_by_customer_id(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Accounts can be filtered by customer_id query parameter."""
+        await _create_admin(db_session)
+        alice = await create_test_customer(
+            db_session, first_name="Alice", email="filter-a@example.com"
+        )
+        bob = await create_test_customer(db_session, first_name="Bob", email="filter-b@example.com")
+        await create_test_account(
+            db_session,
+            customer_id=alice.id,
+            account_number="1000-7001-0001",
+            balance_cents=100_000,
+        )
+        await create_test_account(
+            db_session,
+            customer_id=bob.id,
+            account_number="1000-7002-0001",
+            balance_cents=50_000,
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.get(
+            "/admin/api/accounts",
+            params={"customer_id": alice.id},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["account_number"] == "1000-7001-0001"
+
+
+# ===========================================================================
+# GET /admin/api/audit-logs?account_id=
+# ===========================================================================
+
+
+class TestAuditLogsAccountFilter:
+    async def test_filter_by_account_id(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Audit logs can be filtered by account_id query parameter."""
+        await _create_admin(db_session)
+        account_id = await _seed_account(db_session)
+        # Create logs with and without account_id
+        db_session.add(
+            AuditLog(
+                event_type=AuditEventType.WITHDRAWAL,
+                account_id=account_id,
+                details={"amount": 10000},
+            )
+        )
+        db_session.add(
+            AuditLog(
+                event_type=AuditEventType.LOGIN_SUCCESS,
+                details={"card": "***0001"},
+            )
+        )
+        await db_session.flush()
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.get(
+            "/admin/api/audit-logs",
+            params={"account_id": account_id},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) >= 1
+        assert all(log["account_id"] == account_id for log in data)

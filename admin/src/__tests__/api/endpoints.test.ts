@@ -3,6 +3,7 @@ import adminClient from "../../api/client";
 import {
   login,
   logout,
+  getDashboardStats,
   getAccounts,
   freezeAccount,
   unfreezeAccount,
@@ -56,6 +57,14 @@ describe("API endpoints", () => {
     const result = await logout();
     expect(mockPost).toHaveBeenCalledWith("/logout");
     expect(result).toEqual({ message: "Logged out" });
+  });
+
+  it("getDashboardStats calls GET /dashboard-stats", async () => {
+    const stats = { total_customers: 3, active_accounts: 5 };
+    mockGet.mockResolvedValue({ data: stats });
+    const result = await getDashboardStats();
+    expect(mockGet).toHaveBeenCalledWith("/dashboard-stats");
+    expect(result).toEqual(stats);
   });
 
   it("getAccounts calls GET /accounts", async () => {

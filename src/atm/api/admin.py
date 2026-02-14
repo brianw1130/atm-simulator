@@ -1,6 +1,8 @@
 """Admin panel API endpoints."""
 
 import json as json_module
+import logging
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, UploadFile
@@ -33,6 +35,7 @@ from src.atm.services.admin_service import (
     get_all_customers,
     get_audit_logs,
     get_customer_detail,
+    get_dashboard_stats,
     get_maintenance_status,
     import_snapshot,
     unfreeze_account,
@@ -40,6 +43,8 @@ from src.atm.services.admin_service import (
     update_customer,
     validate_admin_session,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -121,18 +126,37 @@ async def admin_logout_endpoint(
     return {"message": "Logged out"}
 
 
-@router.get("/api/accounts")
-async def list_accounts(db: DbSession, admin: AdminSession) -> list[dict[str, Any]]:
-    """List all accounts with customer info.
+@router.get("/api/dashboard-stats")
+async def dashboard_stats(db: DbSession, admin: AdminSession) -> dict[str, Any]:
+    """Get aggregate dashboard statistics.
 
     Args:
         db: Database session.
         admin: Validated admin session data.
 
     Returns:
+        Stats dict with customer/account counts and total balance.
+    """
+    return await get_dashboard_stats(db)
+
+
+@router.get("/api/accounts")
+async def list_accounts(
+    db: DbSession,
+    admin: AdminSession,
+    customer_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """List all accounts with customer info.
+
+    Args:
+        db: Database session.
+        admin: Validated admin session data.
+        customer_id: Optional filter by customer ID.
+
+    Returns:
         List of account dicts.
     """
-    return await get_all_accounts(db)
+    return await get_all_accounts(db, customer_id=customer_id)
 
 
 @router.post("/api/accounts/{account_id}/freeze")
@@ -185,6 +209,7 @@ async def list_audit_logs(
     admin: AdminSession,
     limit: int = 100,
     event_type: str | None = None,
+    account_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """List recent audit log entries.
 
@@ -193,11 +218,12 @@ async def list_audit_logs(
         admin: Validated admin session data.
         limit: Maximum number of entries to return.
         event_type: Optional filter by event type.
+        account_id: Optional filter by account ID.
 
     Returns:
         List of audit log dicts.
     """
-    return await get_audit_logs(db, limit=limit, event_type=event_type)
+    return await get_audit_logs(db, limit=limit, event_type=event_type, account_id=account_id)
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +544,16 @@ async def export_data(db: DbSession, admin: AdminSession) -> Response:
         JSON response with Content-Disposition attachment header.
     """
     snapshot = await export_snapshot(db)
+
+    # Best-effort save to S3 (non-blocking — browser download works even if S3 fails)
+    try:
+        from src.atm.services.s3_client import upload_snapshot
+
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        upload_snapshot(snapshot, f"atm-snapshot-{timestamp}.json")
+    except Exception:
+        logger.warning("S3 snapshot upload failed", exc_info=True)
+
     content = json_module.dumps(snapshot, indent=2)
     return Response(
         content=content,

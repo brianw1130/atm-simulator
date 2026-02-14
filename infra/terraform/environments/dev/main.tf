@@ -138,7 +138,8 @@ module "ecs" {
   migration_log_group = module.monitoring.migration_log_group_name
 
   # S3
-  s3_statements_bucket_arn = module.s3.bucket_arn
+  s3_statements_bucket_arn  = module.s3.bucket_arn
+  s3_statements_bucket_name = module.s3.bucket_name
 
   # Sizing (minimal for dev)
   app_cpu              = 256 # 0.25 vCPU

@@ -42,8 +42,13 @@ class Settings(BaseSettings):
     # Frontend
     frontend_enabled: bool = True
 
+    # AWS S3
+    s3_bucket_name: str = ""
+    aws_region: str = "us-east-1"
+
     # Seed data
     seed_snapshot_path: str = ""
+    seed_snapshot_s3_key: str = ""
 
     # Environment
     environment: str = "development"

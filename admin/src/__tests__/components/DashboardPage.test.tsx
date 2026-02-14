@@ -5,33 +5,22 @@ import { DashboardPage } from "../../components/pages/DashboardPage";
 import * as api from "../../api/endpoints";
 
 vi.mock("../../api/endpoints", () => ({
-  getAccounts: vi.fn(),
+  getDashboardStats: vi.fn(),
   getAuditLogs: vi.fn(),
   getMaintenanceStatus: vi.fn(),
   exportSnapshot: vi.fn(),
   importSnapshot: vi.fn(),
 }));
 
-const mockAccounts = [
-  {
-    id: 1,
-    account_number: "1000-0001-0001",
-    account_type: "CHECKING" as const,
-    balance: "5250.00",
-    available_balance: "5250.00",
-    status: "ACTIVE" as const,
-    customer_name: "Alice Johnson",
-  },
-  {
-    id: 2,
-    account_number: "1000-0002-0001",
-    account_type: "CHECKING" as const,
-    balance: "850.75",
-    available_balance: "850.75",
-    status: "FROZEN" as const,
-    customer_name: "Bob Williams",
-  },
-];
+const mockStats = {
+  total_customers: 3,
+  active_customers: 3,
+  total_accounts: 5,
+  active_accounts: 4,
+  frozen_accounts: 1,
+  closed_accounts: 0,
+  total_balance_formatted: "$18,600.75",
+};
 
 const mockLogs = [
   {
@@ -46,7 +35,7 @@ const mockLogs = [
 ];
 
 function mockDashboardData() {
-  vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
+  vi.mocked(api.getDashboardStats).mockResolvedValue(mockStats);
   vi.mocked(api.getAuditLogs).mockResolvedValue(mockLogs);
   vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
     enabled: false,
@@ -60,7 +49,7 @@ describe("DashboardPage", () => {
   });
 
   it("shows loading spinner while fetching", () => {
-    vi.mocked(api.getAccounts).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getDashboardStats).mockReturnValue(new Promise(() => {}));
     vi.mocked(api.getAuditLogs).mockReturnValue(new Promise(() => {}));
     vi.mocked(api.getMaintenanceStatus).mockReturnValue(new Promise(() => {}));
     render(<DashboardPage />);
@@ -75,8 +64,12 @@ describe("DashboardPage", () => {
       expect(screen.getByText("Total Accounts")).toBeInTheDocument();
     });
 
-    // 2 total accounts, 1 active, 1 frozen
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Customers")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument(); // total_customers
+    expect(screen.getByText("5")).toBeInTheDocument(); // total_accounts
+    expect(screen.getByText("4")).toBeInTheDocument(); // active_accounts
+    expect(screen.getByText("1")).toBeInTheDocument(); // frozen_accounts
+    expect(screen.getByText("$18,600.75")).toBeInTheDocument(); // total_balance
     expect(screen.getByText("OFF")).toBeInTheDocument();
   });
 
@@ -92,7 +85,12 @@ describe("DashboardPage", () => {
   });
 
   it("shows maintenance ON badge when enabled", async () => {
-    vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      ...mockStats,
+      total_accounts: 0,
+      active_accounts: 0,
+      frozen_accounts: 0,
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: true,
@@ -106,7 +104,7 @@ describe("DashboardPage", () => {
   });
 
   it("shows error on API failure", async () => {
-    vi.mocked(api.getAccounts).mockRejectedValue(new Error("Server error"));
+    vi.mocked(api.getDashboardStats).mockRejectedValue(new Error("Server error"));
     vi.mocked(api.getAuditLogs).mockRejectedValue(new Error("Server error"));
     vi.mocked(api.getMaintenanceStatus).mockRejectedValue(
       new Error("Server error"),

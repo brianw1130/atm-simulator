@@ -8,6 +8,7 @@ vi.mock("../../api/endpoints", () => ({
   getAccounts: vi.fn(),
   freezeAccount: vi.fn(),
   unfreezeAccount: vi.fn(),
+  closeAccount: vi.fn(),
 }));
 
 const mockAccounts = [
@@ -87,7 +88,7 @@ describe("AccountsPage", () => {
     });
   });
 
-  it("calls freezeAccount API and refreshes on freeze", async () => {
+  it("calls freezeAccount API and shows notification on freeze", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(api.freezeAccount).mockResolvedValue({ message: "Frozen" });
@@ -99,9 +100,13 @@ describe("AccountsPage", () => {
 
     await user.click(screen.getByText("Freeze"));
     expect(api.freezeAccount).toHaveBeenCalledWith(1);
+
+    await waitFor(() => {
+      expect(screen.getByText("Account frozen")).toBeInTheDocument();
+    });
   });
 
-  it("calls unfreezeAccount API and refreshes on unfreeze", async () => {
+  it("calls unfreezeAccount API and shows notification on unfreeze", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
     vi.mocked(api.unfreezeAccount).mockResolvedValue({ message: "Unfrozen" });
@@ -113,6 +118,10 @@ describe("AccountsPage", () => {
 
     await user.click(screen.getByText("Unfreeze"));
     expect(api.unfreezeAccount).toHaveBeenCalledWith(2);
+
+    await waitFor(() => {
+      expect(screen.getByText("Account unfrozen")).toBeInTheDocument();
+    });
   });
 
   it("shows N/A for CLOSED accounts", async () => {
@@ -121,6 +130,48 @@ describe("AccountsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("N/A")).toBeInTheDocument();
+    });
+  });
+
+  it("shows Close button for ACTIVE accounts", async () => {
+    vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
+    render(<AccountsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Close")).toBeInTheDocument();
+    });
+  });
+
+  it("close button opens confirm dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
+    render(<AccountsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Close")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Close"));
+
+    expect(
+      screen.getByText(/Are you sure you want to close account 1000-0001-0001/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows error notification on freeze failure", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getAccounts).mockResolvedValue(mockAccounts);
+    vi.mocked(api.freezeAccount).mockRejectedValue(new Error("fail"));
+    render(<AccountsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Freeze")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Freeze"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to freeze account")).toBeInTheDocument();
     });
   });
 });

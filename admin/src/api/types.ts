@@ -77,6 +77,16 @@ export interface AccountCreateData {
   initial_balance_cents: number;
 }
 
+export interface DashboardStats {
+  total_customers: number;
+  active_customers: number;
+  total_accounts: number;
+  active_accounts: number;
+  frozen_accounts: number;
+  closed_accounts: number;
+  total_balance_formatted: string;
+}
+
 export const AUDIT_EVENT_TYPES = [
   "AUTH_SUCCESS",
   "AUTH_FAILURE",

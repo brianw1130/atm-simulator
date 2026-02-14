@@ -7,21 +7,25 @@ import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { usePolling } from "../../hooks/usePolling";
 import { useNotification } from "../../hooks/useNotification";
 import * as api from "../../api/endpoints";
-import type { AdminAccount, AuditLogEntry, MaintenanceStatus } from "../../api/types";
+import type {
+  AuditLogEntry,
+  DashboardStats,
+  MaintenanceStatus,
+} from "../../api/types";
 
 interface DashboardData {
-  accounts: AdminAccount[];
+  stats: DashboardStats;
   recentActivity: AuditLogEntry[];
   maintenance: MaintenanceStatus;
 }
 
 async function fetchDashboardData(): Promise<DashboardData> {
-  const [accounts, recentActivity, maintenance] = await Promise.all([
-    api.getAccounts(),
+  const [stats, recentActivity, maintenance] = await Promise.all([
+    api.getDashboardStats(),
     api.getAuditLogs(10),
     api.getMaintenanceStatus(),
   ]);
-  return { accounts, recentActivity, maintenance };
+  return { stats, recentActivity, maintenance };
 }
 
 const activityColumns = [
@@ -101,27 +105,23 @@ export function DashboardPage() {
   if (error) return <div className="page-error">Error: {error}</div>;
   if (isLoading || !data) return <LoadingSpinner />;
 
-  const totalAccounts = data.accounts.length;
-  const activeAccounts = data.accounts.filter(
-    (a) => a.status === "ACTIVE",
-  ).length;
-  const frozenAccounts = data.accounts.filter(
-    (a) => a.status === "FROZEN",
-  ).length;
+  const { stats } = data;
   const maintenanceLabel = data.maintenance.enabled ? "ON" : "OFF";
 
   return (
     <div className="dashboard-page">
       <NotificationToast notification={notification} onDismiss={dismiss} />
       <div className="stats-grid">
-        <StatsCard label="Total Accounts" value={totalAccounts} />
-        <StatsCard label="Active" value={activeAccounts} variant="success" />
-        <StatsCard label="Frozen" value={frozenAccounts} variant="warning" />
+        <StatsCard label="Customers" value={stats.total_customers} />
+        <StatsCard label="Total Accounts" value={stats.total_accounts} />
+        <StatsCard label="Active" value={stats.active_accounts} variant="success" />
+        <StatsCard label="Frozen" value={stats.frozen_accounts} variant="warning" />
         <StatsCard
           label="Maintenance"
           value={maintenanceLabel}
           variant={data.maintenance.enabled ? "danger" : "default"}
         />
+        <StatsCard label="Total Balance" value={stats.total_balance_formatted} />
       </div>
       <section className="dashboard-section">
         <h2>Recent Activity</h2>

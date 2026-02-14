@@ -137,7 +137,8 @@ module "ecs" {
   migration_log_group = module.monitoring.migration_log_group_name
 
   # S3
-  s3_statements_bucket_arn = module.s3.bucket_arn
+  s3_statements_bucket_arn  = module.s3.bucket_arn
+  s3_statements_bucket_name = module.s3.bucket_name
 
   # Observability
   container_insights = true

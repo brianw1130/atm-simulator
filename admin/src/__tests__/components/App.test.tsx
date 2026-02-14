@@ -6,10 +6,16 @@ import * as api from "../../api/endpoints";
 
 vi.mock("../../api/endpoints", () => ({
   getAccounts: vi.fn(),
+  getDashboardStats: vi.fn(),
   getAuditLogs: vi.fn(),
   getMaintenanceStatus: vi.fn(),
   getCustomers: vi.fn(),
   getCustomerDetail: vi.fn(),
+  freezeAccount: vi.fn(),
+  unfreezeAccount: vi.fn(),
+  closeAccount: vi.fn(),
+  exportSnapshot: vi.fn(),
+  importSnapshot: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
 }));
@@ -38,18 +44,16 @@ describe("App", () => {
   });
 
   it("shows dashboard when authenticated", async () => {
-    const mockAccountData = [
-      {
-        id: 1,
-        account_number: "1000-0001-0001",
-        account_type: "CHECKING" as const,
-        balance: "5250.00",
-        available_balance: "5250.00",
-        status: "ACTIVE" as const,
-        customer_name: "Alice",
-      },
-    ];
-    vi.mocked(api.getAccounts).mockResolvedValue(mockAccountData);
+    vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      total_customers: 3,
+      active_customers: 3,
+      total_accounts: 5,
+      active_accounts: 4,
+      frozen_accounts: 1,
+      closed_accounts: 0,
+      total_balance_formatted: "$18,600.75",
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: false,
@@ -77,6 +81,15 @@ describe("App", () => {
       },
     ];
     vi.mocked(api.getAccounts).mockResolvedValue(mockAccountData);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      total_customers: 3,
+      active_customers: 3,
+      total_accounts: 5,
+      active_accounts: 4,
+      frozen_accounts: 1,
+      closed_accounts: 0,
+      total_balance_formatted: "$18,600.75",
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: false,
@@ -99,6 +112,15 @@ describe("App", () => {
   it("logs out and returns to login", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      total_customers: 0,
+      active_customers: 0,
+      total_accounts: 0,
+      active_accounts: 0,
+      frozen_accounts: 0,
+      closed_accounts: 0,
+      total_balance_formatted: "$0.00",
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: false,
@@ -124,6 +146,15 @@ describe("App", () => {
   it("navigates to Customers page", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      total_customers: 0,
+      active_customers: 0,
+      total_accounts: 0,
+      active_accounts: 0,
+      frozen_accounts: 0,
+      closed_accounts: 0,
+      total_balance_formatted: "$0.00",
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: false,
@@ -158,6 +189,15 @@ describe("App", () => {
       },
     ];
     vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getDashboardStats).mockResolvedValue({
+      total_customers: 1,
+      active_customers: 1,
+      total_accounts: 1,
+      active_accounts: 1,
+      frozen_accounts: 0,
+      closed_accounts: 0,
+      total_balance_formatted: "$5,250.00",
+    });
     vi.mocked(api.getAuditLogs).mockResolvedValue([]);
     vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
       enabled: false,

@@ -1002,9 +1002,7 @@ class TestImportSnapshot:
 
     async def test_conflict_replace(self, db_session: AsyncSession) -> None:
         """Replace strategy updates existing customer fields."""
-        await create_test_customer(
-            db_session, email="replace@example.com", first_name="Original"
-        )
+        await create_test_customer(db_session, email="replace@example.com", first_name="Original")
         await db_session.commit()
 
         snapshot = {
@@ -1029,10 +1027,14 @@ class TestImportSnapshot:
         from src.atm.models.customer import Customer
 
         cust = (
-            await db_session.execute(
-                select(Customer).where(Customer.email == "replace@example.com")
+            (
+                await db_session.execute(
+                    select(Customer).where(Customer.email == "replace@example.com")
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         assert cust is not None
         assert cust.first_name == "Replaced"
 
@@ -1077,10 +1079,14 @@ class TestImportSnapshot:
         from src.atm.models.card import ATMCard
 
         card = (
-            await db_session.execute(
-                select(ATMCard).where(ATMCard.card_number == "1000-9002-0001")
+            (
+                await db_session.execute(
+                    select(ATMCard).where(ATMCard.card_number == "1000-9002-0001")
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         assert card is not None
         assert card.pin_hash == original_hash
 
@@ -1168,10 +1174,14 @@ class TestImportSnapshot:
         await db_session.commit()
 
         acct = (
-            await db_session.execute(
-                select(Account).where(Account.account_number == "1000-9003-0001")
+            (
+                await db_session.execute(
+                    select(Account).where(Account.account_number == "1000-9003-0001")
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         assert acct is not None
         assert acct.daily_withdrawal_used_cents == 0
         assert acct.daily_transfer_used_cents == 0
