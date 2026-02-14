@@ -68,11 +68,13 @@ jobs:
       - name: Run migration task
         id: run-migration
         run: |
+          # Build subnet list as JSON array from comma-separated var
+          SUBNETS=$(echo '${{ vars.SUBNET_IDS }}' | jq -R 'split(",")' )
           TASK_ARN=$(aws ecs run-task \
             --cluster "${{ env.ECS_CLUSTER }}" \
             --task-definition "atm-simulator-${{ inputs.environment || 'dev' }}-migration" \
             --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=${{ vars.SUBNET_IDS }},securityGroups=[${{ vars.SECURITY_GROUP_ID }}],assignPublicIp=ENABLED}" \
+            --network-configuration "{\"awsvpcConfiguration\":{\"subnets\":${SUBNETS},\"securityGroups\":[\"${{ vars.SECURITY_GROUP_ID }}\"],\"assignPublicIp\":\"ENABLED\"}}" \
             --query 'tasks[0].taskArn' \
             --output text)
           echo "task_arn=${TASK_ARN}" >> "$GITHUB_OUTPUT"
