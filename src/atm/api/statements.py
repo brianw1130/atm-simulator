@@ -10,8 +10,8 @@ Routes:
     GET /download/{filename} — Download generated PDF statement
 """
 
+import os
 import re
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
@@ -160,16 +160,22 @@ async def download_statement(
             detail="Invalid filename",
         )
 
-    file_path = Path(settings.statement_output_dir) / filename
+    output_dir = os.path.realpath(settings.statement_output_dir)
+    real_path = os.path.realpath(os.path.join(output_dir, filename))
+    if not real_path.startswith(output_dir + os.sep):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
 
-    if not file_path.is_file():
+    if not os.path.isfile(real_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Statement not found",
         )
 
     return FileResponse(
-        path=str(file_path),
+        path=real_path,
         media_type="application/pdf",
         filename=filename,
     )

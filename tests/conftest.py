@@ -50,7 +50,8 @@ def _add_customer_selectinload(orm_execute_state):  # type: ignore[no-untyped-de
 
 # Use a unique file-based SQLite for each test run to avoid stale state.
 # We use a temp file so parallel runs don't collide.
-_test_db_path = tempfile.mktemp(suffix=".db", prefix="atm_test_")
+with tempfile.NamedTemporaryFile(suffix=".db", prefix="atm_test_", delete=False) as _f:
+    _test_db_path = _f.name
 TEST_DATABASE_URL = f"sqlite+aiosqlite:///{_test_db_path}"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
