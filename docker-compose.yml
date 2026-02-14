@@ -70,6 +70,8 @@ services:
     volumes:
       - ./frontend:/frontend
       - frontend_node_modules:/frontend/node_modules
+    environment:
+      VITE_API_TARGET: "http://app:8000"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - app
@@ -83,6 +85,8 @@ services:
     volumes:
       - ./admin:/admin
       - admin_node_modules:/admin/node_modules
+    environment:
+      VITE_API_TARGET: "http://app:8000"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - app

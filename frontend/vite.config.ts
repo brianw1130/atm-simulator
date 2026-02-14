@@ -9,11 +9,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
       },
-      "/health": { target: "http://localhost:8000" },
-      "/ready": { target: "http://localhost:8000" },
+      "/health": { target: process.env.VITE_API_TARGET ?? "http://localhost:8000" },
+      "/ready": { target: process.env.VITE_API_TARGET ?? "http://localhost:8000" },
     },
   },
   build: {
