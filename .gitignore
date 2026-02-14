@@ -38,6 +38,8 @@ test-statements/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 
 # Admin
 admin/node_modules/
