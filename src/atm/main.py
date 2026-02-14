@@ -33,7 +33,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     async with async_session_factory() as session:
         try:
-            await seed_database(session)
+            snapshot = settings.seed_snapshot_path or None
+            await seed_database(session, snapshot_path=snapshot)
             await session.commit()
             logger.info("Database seeding completed successfully.")
         except Exception:

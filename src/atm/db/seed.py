@@ -6,9 +6,14 @@ Creates sample customers, accounts, and cards as defined in CLAUDE.md:
     - Alice Johnson: Checking ($5,250) + Savings ($12,500), PIN 1234
     - Bob Williams: Checking ($850.75), PIN 5678
     - Charlie Davis: Checking ($0) + Savings ($100), PIN 9012
+
+Supports seeding from a JSON snapshot file when ``snapshot_path`` is provided.
 """
 
+import json
+import logging
 from datetime import date
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,9 +25,18 @@ from src.atm.models.card import ATMCard
 from src.atm.models.customer import Customer
 from src.atm.utils.security import hash_pin
 
+logger = logging.getLogger(__name__)
 
-async def seed_database(session: AsyncSession) -> None:
+
+async def seed_database(
+    session: AsyncSession,
+    snapshot_path: str | None = None,
+) -> None:
     """Populate the database with sample data for development and testing.
+
+    If ``snapshot_path`` is provided and the file exists, seed from the JSON
+    snapshot instead of using hardcoded data. Otherwise, fall back to the
+    default hardcoded seed data.
 
     This function is idempotent: it checks for existing data before inserting.
     If any customers already exist, the function returns without making changes.
@@ -30,7 +44,19 @@ async def seed_database(session: AsyncSession) -> None:
     Args:
         session: An async SQLAlchemy session. The caller is responsible for
             committing or rolling back the transaction.
+        snapshot_path: Optional path to a JSON snapshot file to seed from.
     """
+    if snapshot_path:
+        path = Path(snapshot_path)
+        if path.exists():
+            logger.info("Seeding database from snapshot: %s", snapshot_path)
+            from src.atm.services.admin_service import import_snapshot
+
+            with open(path) as f:
+                data = json.load(f)
+            await import_snapshot(session, data, conflict_strategy="skip")
+            return
+        logger.warning("Snapshot path %s does not exist, falling back to default seed.", path)
     # Seed admin user independently (safe to run on existing databases)
     existing_admin = await session.execute(select(AdminUser).limit(1))
     if existing_admin.scalars().first() is None:

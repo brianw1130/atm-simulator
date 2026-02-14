@@ -754,3 +754,161 @@ class TestResetPinEndpoint:
             json={"new_pin": "4829"},
         )
         assert resp.status_code == 401
+
+
+# ===========================================================================
+# Export / Import endpoints
+# ===========================================================================
+
+
+class TestExportEndpoint:
+    async def test_export_returns_json_download(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """GET /api/export returns JSON with content-disposition header."""
+        await _create_admin(db_session)
+        await _seed_account(db_session)
+        cookies = await _login(client)
+
+        resp = await client.get("/admin/api/export", cookies=cookies)
+        assert resp.status_code == 200
+        assert "attachment" in resp.headers.get("content-disposition", "")
+        data = resp.json()
+        assert data["version"] == "1.0"
+        assert "customers" in data
+        assert "admin_users" in data
+
+    async def test_export_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated export returns 401."""
+        resp = await client.get("/admin/api/export")
+        assert resp.status_code == 401
+
+
+class TestImportEndpoint:
+    async def test_import_success(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """POST /api/import with valid JSON creates entities."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        import json
+
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Import",
+                    "last_name": "Test",
+                    "date_of_birth": "1990-01-01",
+                    "email": "import-integ@example.com",
+                    "is_active": True,
+                    "accounts": [
+                        {
+                            "account_number": "1000-9099-0001",
+                            "account_type": "CHECKING",
+                            "balance_cents": 50000,
+                            "available_balance_cents": 50000,
+                            "status": "ACTIVE",
+                            "cards": [],
+                        }
+                    ],
+                }
+            ],
+            "admin_users": [],
+        }
+        file_content = json.dumps(snapshot).encode()
+
+        resp = await client.post(
+            "/admin/api/import?conflict_strategy=skip",
+            files={"file": ("snapshot.json", file_content, "application/json")},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["customers_created"] == 1
+        assert data["accounts_created"] == 1
+
+    async def test_import_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated import returns 401."""
+        resp = await client.post(
+            "/admin/api/import",
+            files={"file": ("snapshot.json", b"{}", "application/json")},
+        )
+        assert resp.status_code == 401
+
+    async def test_import_invalid_json_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Invalid JSON file returns 422."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        resp = await client.post(
+            "/admin/api/import",
+            files={"file": ("bad.json", b"not json!", "application/json")},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+    async def test_import_malformed_snapshot_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Valid JSON without required keys returns 422."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        import json
+
+        resp = await client.post(
+            "/admin/api/import",
+            files={"file": ("bad.json", json.dumps({"foo": "bar"}).encode(), "application/json")},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+    async def test_import_invalid_conflict_strategy_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Invalid conflict_strategy returns 422."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        import json
+
+        snapshot = json.dumps({"version": "1.0", "customers": [], "admin_users": []}).encode()
+        resp = await client.post(
+            "/admin/api/import?conflict_strategy=invalid",
+            files={"file": ("snapshot.json", snapshot, "application/json")},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+    async def test_export_import_round_trip(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Export then re-import with skip produces zero creates."""
+        await _create_admin(db_session)
+        await _seed_account(db_session)
+        cookies = await _login(client)
+
+        # Export
+        export_resp = await client.get("/admin/api/export", cookies=cookies)
+        assert export_resp.status_code == 200
+        snapshot_bytes = export_resp.content
+
+        # Re-import with skip
+        import_resp = await client.post(
+            "/admin/api/import?conflict_strategy=skip",
+            files={"file": ("snapshot.json", snapshot_bytes, "application/json")},
+            cookies=cookies,
+        )
+        assert import_resp.status_code == 200
+        data = import_resp.json()
+        assert data["customers_skipped"] >= 1
+        assert data["customers_created"] == 0

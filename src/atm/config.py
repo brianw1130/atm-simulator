@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Frontend
     frontend_enabled: bool = True
 
+    # Seed data
+    seed_snapshot_path: str = ""
+
     # Environment
     environment: str = "development"
 

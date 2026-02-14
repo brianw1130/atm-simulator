@@ -890,3 +890,48 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Data Management */
+.data-management-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.data-management-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.data-management-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.data-management-card p {
+  color: var(--text-muted, #64748b);
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+.import-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.conflict-strategy {
+  display: flex;
+  gap: 1rem;
+}
+
+.conflict-strategy label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}

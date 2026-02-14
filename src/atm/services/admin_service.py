@@ -2,6 +2,7 @@
 
 import json
 import secrets
+from datetime import date
 from typing import Any
 
 from sqlalchemy import select
@@ -772,3 +773,279 @@ async def admin_reset_pin(
     )
 
     return {"message": f"PIN reset for card {card.card_number}"}
+
+
+# ---------------------------------------------------------------------------
+# Data Export / Import
+# ---------------------------------------------------------------------------
+
+
+async def export_snapshot(session: AsyncSession) -> dict[str, Any]:
+    """Export the entire database as a JSON-serializable dict.
+
+    Includes customers, accounts, cards, and admin users. PINs are exported
+    as "CHANGE_ME" sentinels alongside the actual pin_hash for portability.
+    Transactions are excluded (operational data, not config).
+
+    Args:
+        session: Async database session.
+
+    Returns:
+        Nested dict ready for JSON serialization.
+    """
+    from datetime import UTC, datetime
+
+    # Fetch all customers with accounts and cards
+    stmt = (
+        select(Customer)
+        .options(
+            selectinload(Customer.accounts).selectinload(Account.cards),
+        )
+        .order_by(Customer.id)
+    )
+    result = await session.execute(stmt)
+    customers = result.scalars().all()
+
+    customers_data = []
+    for c in customers:
+        accounts_data = []
+        for a in c.accounts:
+            cards_data = []
+            for card in a.cards:
+                cards_data.append(
+                    {
+                        "card_number": card.card_number,
+                        "pin": "CHANGE_ME",
+                        "pin_hash": card.pin_hash,
+                        "is_active": card.is_active,
+                    }
+                )
+            accounts_data.append(
+                {
+                    "account_number": a.account_number,
+                    "account_type": a.account_type.value,
+                    "balance_cents": a.balance_cents,
+                    "available_balance_cents": a.available_balance_cents,
+                    "status": a.status.value,
+                    "cards": cards_data,
+                }
+            )
+        customers_data.append(
+            {
+                "first_name": c.first_name,
+                "last_name": c.last_name,
+                "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+                "email": c.email,
+                "phone": c.phone,
+                "is_active": c.is_active,
+                "accounts": accounts_data,
+            }
+        )
+
+    # Fetch admin users
+    admin_result = await session.execute(select(AdminUser).order_by(AdminUser.id))
+    admin_users = admin_result.scalars().all()
+    admin_data = [
+        {
+            "username": au.username,
+            "password": "CHANGE_ME",
+            "password_hash": au.password_hash,
+            "role": au.role,
+            "is_active": au.is_active,
+        }
+        for au in admin_users
+    ]
+
+    await log_event(
+        session,
+        AuditEventType.DATA_EXPORTED,
+        details={
+            "customer_count": len(customers_data),
+            "admin_user_count": len(admin_data),
+        },
+    )
+
+    return {
+        "version": "1.0",
+        "exported_at": datetime.now(UTC).isoformat(),
+        "customers": customers_data,
+        "admin_users": admin_data,
+    }
+
+
+async def import_snapshot(
+    session: AsyncSession,
+    data: dict[str, Any],
+    conflict_strategy: str = "skip",
+) -> dict[str, Any]:
+    """Import a JSON snapshot into the database.
+
+    Args:
+        session: Async database session.
+        data: Parsed JSON snapshot dict.
+        conflict_strategy: "skip" to keep existing records, "replace" to overwrite.
+
+    Returns:
+        Summary dict with counts of imported/skipped entities.
+
+    Raises:
+        ValueError: If the snapshot data is malformed.
+    """
+    if "customers" not in data:
+        raise ValueError("Invalid snapshot: missing 'customers' key")
+    if "version" not in data:
+        raise ValueError("Invalid snapshot: missing 'version' key")
+
+    pepper = settings.pin_pepper
+    stats: dict[str, int] = {
+        "customers_created": 0,
+        "customers_skipped": 0,
+        "customers_replaced": 0,
+        "accounts_created": 0,
+        "accounts_skipped": 0,
+        "accounts_replaced": 0,
+        "cards_created": 0,
+        "admin_users_created": 0,
+        "admin_users_skipped": 0,
+    }
+
+    for cust_data in data["customers"]:
+        # Parse date_of_birth string to date object if needed
+        dob_raw = cust_data.get("date_of_birth")
+        dob = date.fromisoformat(dob_raw) if isinstance(dob_raw, str) else dob_raw
+
+        # Check for existing customer by email
+        existing_result = await session.execute(
+            select(Customer).where(Customer.email == cust_data["email"])
+        )
+        existing_customer = existing_result.scalars().first()
+
+        if existing_customer is not None:
+            if conflict_strategy == "skip":
+                stats["customers_skipped"] += 1
+                # Still process accounts for existing customer if replace
+                continue
+            # Replace: update existing customer fields
+            existing_customer.first_name = cust_data["first_name"]
+            existing_customer.last_name = cust_data["last_name"]
+            existing_customer.date_of_birth = dob
+            existing_customer.phone = cust_data.get("phone")
+            existing_customer.is_active = cust_data.get("is_active", True)
+            await session.flush()
+            customer = existing_customer
+            stats["customers_replaced"] += 1
+        else:
+            customer = Customer(
+                first_name=cust_data["first_name"],
+                last_name=cust_data["last_name"],
+                date_of_birth=dob,
+                email=cust_data["email"],
+                phone=cust_data.get("phone"),
+                is_active=cust_data.get("is_active", True),
+            )
+            session.add(customer)
+            await session.flush()
+            stats["customers_created"] += 1
+
+        # Process accounts
+        for acct_data in cust_data.get("accounts", []):
+            existing_acct_result = await session.execute(
+                select(Account).where(Account.account_number == acct_data["account_number"])
+            )
+            existing_acct = existing_acct_result.scalars().first()
+
+            if existing_acct is not None:
+                if conflict_strategy == "skip":
+                    stats["accounts_skipped"] += 1
+                    continue
+                # Replace: update balance and status
+                existing_acct.balance_cents = acct_data["balance_cents"]
+                existing_acct.available_balance_cents = acct_data["available_balance_cents"]
+                existing_acct.status = AccountStatus(acct_data["status"])
+                existing_acct.daily_withdrawal_used_cents = 0
+                existing_acct.daily_transfer_used_cents = 0
+                await session.flush()
+                account = existing_acct
+                stats["accounts_replaced"] += 1
+            else:
+                account = Account(
+                    customer_id=customer.id,
+                    account_number=acct_data["account_number"],
+                    account_type=AccountType(acct_data["account_type"]),
+                    balance_cents=acct_data["balance_cents"],
+                    available_balance_cents=acct_data["available_balance_cents"],
+                    status=AccountStatus(acct_data["status"]),
+                    daily_withdrawal_used_cents=0,
+                    daily_transfer_used_cents=0,
+                )
+                session.add(account)
+                await session.flush()
+                stats["accounts_created"] += 1
+
+            # Process cards
+            for card_data in acct_data.get("cards", []):
+                existing_card_result = await session.execute(
+                    select(ATMCard).where(ATMCard.card_number == card_data["card_number"])
+                )
+                existing_card = existing_card_result.scalars().first()
+
+                # Determine PIN hash
+                if card_data.get("pin") and card_data["pin"] != "CHANGE_ME":
+                    pin_hash_value = hash_pin(card_data["pin"], pepper)
+                else:
+                    pin_hash_value = card_data.get("pin_hash", hash_pin("1357", pepper))
+
+                if existing_card is not None:
+                    if conflict_strategy == "replace":
+                        existing_card.pin_hash = pin_hash_value
+                        existing_card.is_active = card_data.get("is_active", True)
+                        existing_card.failed_attempts = 0
+                        existing_card.locked_until = None
+                        await session.flush()
+                    # skip: leave card as-is
+                else:
+                    card = ATMCard(
+                        account_id=account.id,
+                        card_number=card_data["card_number"],
+                        pin_hash=pin_hash_value,
+                        is_active=card_data.get("is_active", True),
+                        failed_attempts=0,
+                    )
+                    session.add(card)
+                    await session.flush()
+                    stats["cards_created"] += 1
+
+    # Process admin users
+    for admin_data in data.get("admin_users", []):
+        existing_admin_result = await session.execute(
+            select(AdminUser).where(AdminUser.username == admin_data["username"])
+        )
+        existing_admin = existing_admin_result.scalars().first()
+
+        if existing_admin is not None:
+            stats["admin_users_skipped"] += 1
+            continue
+
+        # Determine password hash
+        if admin_data.get("password") and admin_data["password"] != "CHANGE_ME":
+            pw_hash = hash_pin(admin_data["password"], pepper)
+        else:
+            pw_hash = admin_data.get("password_hash", hash_pin("admin123", pepper))
+
+        admin_user = AdminUser(
+            username=admin_data["username"],
+            password_hash=pw_hash,
+            role=admin_data.get("role", "admin"),
+            is_active=admin_data.get("is_active", True),
+        )
+        session.add(admin_user)
+        await session.flush()
+        stats["admin_users_created"] += 1
+
+    await log_event(
+        session,
+        AuditEventType.DATA_IMPORTED,
+        details={"conflict_strategy": conflict_strategy, **stats},
+    )
+
+    return stats

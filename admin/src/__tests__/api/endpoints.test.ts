@@ -20,6 +20,8 @@ import {
   updateAccount,
   closeAccount,
   resetPin,
+  exportSnapshot,
+  importSnapshot,
 } from "../../api/endpoints";
 
 vi.mock("../../api/client", () => ({
@@ -206,5 +208,28 @@ describe("API endpoints", () => {
     const result = await resetPin(100, "4567");
     expect(mockPost).toHaveBeenCalledWith("/cards/100/reset-pin", { new_pin: "4567" });
     expect(result).toEqual({ message: "PIN reset" });
+  });
+
+  // --- Export/Import endpoints ---
+
+  it("exportSnapshot calls GET /export with blob responseType", async () => {
+    const blob = new Blob(["{}"], { type: "application/json" });
+    mockGet.mockResolvedValue({ data: blob });
+    const result = await exportSnapshot();
+    expect(mockGet).toHaveBeenCalledWith("/export", { responseType: "blob" });
+    expect(result).toBe(blob);
+  });
+
+  it("importSnapshot calls POST /import with FormData", async () => {
+    const file = new File([JSON.stringify({ version: "1.0" })], "snapshot.json", { type: "application/json" });
+    const stats = { customers_created: 1, accounts_created: 2 };
+    mockPost.mockResolvedValue({ data: stats });
+    const result = await importSnapshot(file, "skip");
+    expect(mockPost).toHaveBeenCalledWith(
+      "/import?conflict_strategy=skip",
+      expect.any(FormData),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    expect(result).toEqual(stats);
   });
 });

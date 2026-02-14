@@ -44,11 +44,13 @@ from src.atm.services.admin_service import (
     create_admin_user,
     create_customer,
     deactivate_customer,
+    export_snapshot,
     freeze_account,
     get_all_accounts,
     get_all_customers,
     get_audit_logs,
     get_customer_detail,
+    import_snapshot,
     unfreeze_account,
     update_account,
     update_customer,
@@ -826,3 +828,390 @@ class TestAdminResetPin:
         log = (await db_session.execute(stmt)).scalars().first()
         assert log is not None
         assert log.details["card_id"] == card.id
+
+
+# ===========================================================================
+# export_snapshot
+# ===========================================================================
+
+
+class TestExportSnapshot:
+    async def test_exports_correct_structure(self, db_session: AsyncSession) -> None:
+        """Snapshot has version, exported_at, customers, and admin_users keys."""
+        customer = await create_test_customer(db_session, email="export1@example.com")
+        await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8001-0001",
+        )
+        await create_admin_user(db_session, "exportadmin", "pass123")
+        await db_session.commit()
+
+        snapshot = await export_snapshot(db_session)
+
+        assert snapshot["version"] == "1.0"
+        assert "exported_at" in snapshot
+        assert len(snapshot["customers"]) == 1
+        assert len(snapshot["admin_users"]) == 1
+        assert snapshot["customers"][0]["email"] == "export1@example.com"
+        assert snapshot["customers"][0]["accounts"][0]["account_number"] == "1000-8001-0001"
+
+    async def test_empty_database(self, db_session: AsyncSession) -> None:
+        """Snapshot from an empty database has empty lists."""
+        snapshot = await export_snapshot(db_session)
+
+        assert snapshot["customers"] == []
+        assert snapshot["admin_users"] == []
+
+    async def test_pin_sentinel_value(self, db_session: AsyncSession) -> None:
+        """Cards export with CHANGE_ME pin sentinel and actual pin_hash."""
+        customer = await create_test_customer(db_session, email="exportpin@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8002-0001",
+        )
+        card = await create_test_card(
+            db_session,
+            account_id=account.id,
+            card_number="1000-8002-0001",
+            pin="5678",
+        )
+        await db_session.commit()
+
+        snapshot = await export_snapshot(db_session)
+        exported_card = snapshot["customers"][0]["accounts"][0]["cards"][0]
+
+        assert exported_card["pin"] == "CHANGE_ME"
+        assert exported_card["pin_hash"] == card.pin_hash
+        assert exported_card["card_number"] == "1000-8002-0001"
+
+    async def test_admin_users_included(self, db_session: AsyncSession) -> None:
+        """Admin users are exported with CHANGE_ME password sentinel."""
+        await create_admin_user(db_session, "adminexport", "secret99")
+        await db_session.commit()
+
+        snapshot = await export_snapshot(db_session)
+
+        assert len(snapshot["admin_users"]) == 1
+        admin = snapshot["admin_users"][0]
+        assert admin["username"] == "adminexport"
+        assert admin["password"] == "CHANGE_ME"
+        assert "password_hash" in admin
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Export creates a DATA_EXPORTED audit log entry."""
+        await export_snapshot(db_session)
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.DATA_EXPORTED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+
+
+# ===========================================================================
+# import_snapshot
+# ===========================================================================
+
+
+class TestImportSnapshot:
+    async def test_full_import(self, db_session: AsyncSession) -> None:
+        """Import a complete snapshot and verify all entities created."""
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Test",
+                    "last_name": "User",
+                    "date_of_birth": "1990-01-01",
+                    "email": "import-test@example.com",
+                    "phone": "555-9999",
+                    "is_active": True,
+                    "accounts": [
+                        {
+                            "account_number": "1000-9001-0001",
+                            "account_type": "CHECKING",
+                            "balance_cents": 100000,
+                            "available_balance_cents": 100000,
+                            "status": "ACTIVE",
+                            "cards": [
+                                {
+                                    "card_number": "1000-9001-0001",
+                                    "pin": "4826",
+                                    "pin_hash": "",
+                                    "is_active": True,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "admin_users": [
+                {
+                    "username": "importadmin",
+                    "password": "admin456",
+                    "role": "admin",
+                    "is_active": True,
+                }
+            ],
+        }
+
+        stats = await import_snapshot(db_session, snapshot)
+        await db_session.commit()
+
+        assert stats["customers_created"] == 1
+        assert stats["accounts_created"] == 1
+        assert stats["cards_created"] == 1
+        assert stats["admin_users_created"] == 1
+
+        # Verify card PIN was hashed from plaintext
+        from src.atm.models.card import ATMCard
+
+        card_result = await db_session.execute(
+            select(ATMCard).where(ATMCard.card_number == "1000-9001-0001")
+        )
+        card = card_result.scalars().first()
+        assert card is not None
+        assert verify_pin("4826", card.pin_hash, settings.pin_pepper)
+
+    async def test_conflict_skip(self, db_session: AsyncSession) -> None:
+        """Skip strategy leaves existing customers unchanged."""
+        await create_test_customer(db_session, email="skip@example.com", first_name="Original")
+        await db_session.commit()
+
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Replaced",
+                    "last_name": "User",
+                    "date_of_birth": "1990-01-01",
+                    "email": "skip@example.com",
+                    "is_active": True,
+                    "accounts": [],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        stats = await import_snapshot(db_session, snapshot, conflict_strategy="skip")
+        assert stats["customers_skipped"] == 1
+        assert stats["customers_created"] == 0
+
+    async def test_conflict_replace(self, db_session: AsyncSession) -> None:
+        """Replace strategy updates existing customer fields."""
+        await create_test_customer(
+            db_session, email="replace@example.com", first_name="Original"
+        )
+        await db_session.commit()
+
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Replaced",
+                    "last_name": "User",
+                    "date_of_birth": "1990-01-01",
+                    "email": "replace@example.com",
+                    "is_active": True,
+                    "accounts": [],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        stats = await import_snapshot(db_session, snapshot, conflict_strategy="replace")
+        assert stats["customers_replaced"] == 1
+
+        from src.atm.models.customer import Customer
+
+        cust = (
+            await db_session.execute(
+                select(Customer).where(Customer.email == "replace@example.com")
+            )
+        ).scalars().first()
+        assert cust is not None
+        assert cust.first_name == "Replaced"
+
+    async def test_sentinel_pin_hash_used(self, db_session: AsyncSession) -> None:
+        """When pin is CHANGE_ME, the existing pin_hash is used directly."""
+        original_hash = "$2b$12$fakehashvalue1234567890abcdefghijklmnopqrstuvwx"
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Hash",
+                    "last_name": "Test",
+                    "date_of_birth": "1990-01-01",
+                    "email": "hashtest@example.com",
+                    "is_active": True,
+                    "accounts": [
+                        {
+                            "account_number": "1000-9002-0001",
+                            "account_type": "SAVINGS",
+                            "balance_cents": 50000,
+                            "available_balance_cents": 50000,
+                            "status": "ACTIVE",
+                            "cards": [
+                                {
+                                    "card_number": "1000-9002-0001",
+                                    "pin": "CHANGE_ME",
+                                    "pin_hash": original_hash,
+                                    "is_active": True,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        await import_snapshot(db_session, snapshot)
+        await db_session.commit()
+
+        from src.atm.models.card import ATMCard
+
+        card = (
+            await db_session.execute(
+                select(ATMCard).where(ATMCard.card_number == "1000-9002-0001")
+            )
+        ).scalars().first()
+        assert card is not None
+        assert card.pin_hash == original_hash
+
+    async def test_missing_customers_key_raises(self, db_session: AsyncSession) -> None:
+        """Snapshot without 'customers' key raises ValueError."""
+        with pytest.raises(ValueError, match="missing 'customers'"):
+            await import_snapshot(db_session, {"version": "1.0"})
+
+    async def test_missing_version_key_raises(self, db_session: AsyncSession) -> None:
+        """Snapshot without 'version' key raises ValueError."""
+        with pytest.raises(ValueError, match="missing 'version'"):
+            await import_snapshot(db_session, {"customers": []})
+
+    async def test_idempotent_reimport(self, db_session: AsyncSession) -> None:
+        """Importing the same snapshot twice with skip strategy is idempotent."""
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Idempotent",
+                    "last_name": "Test",
+                    "date_of_birth": "1990-01-01",
+                    "email": "idempotent@example.com",
+                    "is_active": True,
+                    "accounts": [],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        stats1 = await import_snapshot(db_session, snapshot)
+        await db_session.commit()
+        assert stats1["customers_created"] == 1
+
+        stats2 = await import_snapshot(db_session, snapshot, conflict_strategy="skip")
+        assert stats2["customers_skipped"] == 1
+        assert stats2["customers_created"] == 0
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Import creates a DATA_IMPORTED audit log entry."""
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [],
+            "admin_users": [],
+        }
+
+        await import_snapshot(db_session, snapshot)
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.DATA_IMPORTED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+        assert log.details["conflict_strategy"] == "skip"
+
+    async def test_daily_counters_reset_on_import(self, db_session: AsyncSession) -> None:
+        """Imported accounts have daily usage counters reset to zero."""
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Counter",
+                    "last_name": "Test",
+                    "date_of_birth": "1990-01-01",
+                    "email": "counter@example.com",
+                    "is_active": True,
+                    "accounts": [
+                        {
+                            "account_number": "1000-9003-0001",
+                            "account_type": "CHECKING",
+                            "balance_cents": 100000,
+                            "available_balance_cents": 100000,
+                            "status": "ACTIVE",
+                            "cards": [],
+                        }
+                    ],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        await import_snapshot(db_session, snapshot)
+        await db_session.commit()
+
+        acct = (
+            await db_session.execute(
+                select(Account).where(Account.account_number == "1000-9003-0001")
+            )
+        ).scalars().first()
+        assert acct is not None
+        assert acct.daily_withdrawal_used_cents == 0
+        assert acct.daily_transfer_used_cents == 0
+
+
+# ===========================================================================
+# Round-trip: export → import
+# ===========================================================================
+
+
+class TestExportImportRoundTrip:
+    async def test_round_trip(self, db_session: AsyncSession) -> None:
+        """Export data, then import into a clean session and verify match."""
+        # Seed data
+        customer = await create_test_customer(
+            db_session, email="roundtrip@example.com", first_name="RT"
+        )
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-9010-0001",
+            balance_cents=300000,
+        )
+        await create_test_card(
+            db_session,
+            account_id=account.id,
+            card_number="1000-9010-0001",
+            pin="5678",
+        )
+        await create_admin_user(db_session, "rtadmin", "pass123")
+        await db_session.commit()
+
+        # Export
+        snapshot = await export_snapshot(db_session)
+        await db_session.commit()
+
+        assert len(snapshot["customers"]) == 1
+        assert snapshot["customers"][0]["email"] == "roundtrip@example.com"
+        assert snapshot["customers"][0]["accounts"][0]["balance_cents"] == 300000
+
+        # Re-import with skip (should skip all since data exists)
+        stats = await import_snapshot(db_session, snapshot, conflict_strategy="skip")
+        assert stats["customers_skipped"] == 1

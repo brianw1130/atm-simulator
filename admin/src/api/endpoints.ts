@@ -189,3 +189,28 @@ export async function resetPin(
   );
   return response.data;
 }
+
+// --- Data Export/Import ---
+
+export async function exportSnapshot(): Promise<Blob> {
+  const response = await adminClient.get<Blob>("/export", {
+    responseType: "blob",
+  });
+  return response.data;
+}
+
+export async function importSnapshot(
+  file: File,
+  conflictStrategy: "skip" | "replace" = "skip",
+): Promise<Record<string, number>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await adminClient.post<Record<string, number>>(
+    `/import?conflict_strategy=${conflictStrategy}`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
+  return response.data;
+}

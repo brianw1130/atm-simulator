@@ -1,8 +1,9 @@
 """Admin panel API endpoints."""
 
+import json as json_module
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,12 +27,14 @@ from src.atm.services.admin_service import (
     deactivate_customer,
     disable_maintenance_mode,
     enable_maintenance_mode,
+    export_snapshot,
     freeze_account,
     get_all_accounts,
     get_all_customers,
     get_audit_logs,
     get_customer_detail,
     get_maintenance_status,
+    import_snapshot,
     unfreeze_account,
     update_account,
     update_customer,
@@ -496,3 +499,63 @@ async def reset_pin_endpoint(
     if result is None:
         raise HTTPException(status_code=404, detail="Card not found")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Data Export / Import endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/export")
+async def export_data(db: DbSession, admin: AdminSession) -> Response:
+    """Export a complete database snapshot as a JSON file download.
+
+    Args:
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        JSON response with Content-Disposition attachment header.
+    """
+    snapshot = await export_snapshot(db)
+    content = json_module.dumps(snapshot, indent=2)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=atm-snapshot.json"},
+    )
+
+
+@router.post("/api/import")
+async def import_data(
+    file: UploadFile,
+    db: DbSession,
+    admin: AdminSession,
+    conflict_strategy: str = "skip",
+) -> dict[str, Any]:
+    """Import a JSON snapshot file into the database.
+
+    Args:
+        file: Uploaded JSON snapshot file.
+        db: Database session.
+        admin: Validated admin session data.
+        conflict_strategy: "skip" to keep existing records, "replace" to overwrite.
+
+    Returns:
+        Summary dict with counts of imported/skipped entities.
+    """
+    if conflict_strategy not in ("skip", "replace"):
+        raise HTTPException(status_code=422, detail="conflict_strategy must be 'skip' or 'replace'")
+
+    try:
+        raw = await file.read()
+        snapshot = json_module.loads(raw)
+    except (json_module.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid JSON: {exc}") from exc
+
+    try:
+        stats = await import_snapshot(db, snapshot, conflict_strategy)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return stats
