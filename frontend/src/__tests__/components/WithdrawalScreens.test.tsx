@@ -345,6 +345,41 @@ describe("WithdrawalConfirmScreen", () => {
     });
     expect(mockWithdraw).not.toHaveBeenCalled();
   });
+
+  it("handles Pydantic 422 validation error (array detail)", async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: {
+        data: {
+          detail: [
+            {
+              type: "value_error",
+              loc: ["body", "amount_cents"],
+              msg: "Value error, Amount must be positive",
+            },
+          ],
+        },
+        status: 422,
+      },
+    };
+    mockWithdraw.mockRejectedValue(axiosError);
+
+    render(
+      <TestProvider initialState={confirmState}>
+        <WithdrawalConfirmScreen />
+      </TestProvider>,
+    );
+
+    await act(async () => {
+      await WithdrawalConfirmScreen.handleConfirm();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-error")).toHaveTextContent(
+        "Amount must be positive",
+      );
+    });
+  });
 });
 
 describe("WithdrawalReceiptScreen", () => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useLayoutEffect } from "react";
+import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { useATMContext } from "../../hooks/useATMContext";
 import { changePin } from "../../api/endpoints";
 import axios from "axios";
@@ -9,38 +9,28 @@ type Phase = "current" | "new_pin" | "confirm";
 
 export function PinChangeScreen() {
   const { state, dispatch } = useATMContext();
-  const [currentPin, setCurrentPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
+  const [pin, setPin] = useState("");
   const [phase, setPhase] = useState<Phase>("current");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const activePin =
-    phase === "current" ? currentPin : phase === "new_pin" ? newPin : confirmPin;
-
-  const setActivePin =
-    phase === "current"
-      ? setCurrentPin
-      : phase === "new_pin"
-        ? setNewPin
-        : setConfirmPin;
+  // Store completed phase values in refs (no re-render needed)
+  const savedCurrentPin = useRef("");
+  const savedNewPin = useRef("");
 
   const handleDigit = useCallback(
     (digit: string) => {
       if (state.isLoading || success) return;
-      setActivePin((prev) =>
-        prev.length < MAX_PIN_LENGTH ? prev + digit : prev,
-      );
+      setPin((prev) => (prev.length < MAX_PIN_LENGTH ? prev + digit : prev));
       setError(null);
     },
-    [state.isLoading, success, setActivePin],
+    [state.isLoading, success],
   );
 
   const handleClear = useCallback(() => {
-    setActivePin((prev) => prev.slice(0, -1));
+    setPin((prev) => prev.slice(0, -1));
     setError(null);
-  }, [setActivePin]);
+  }, []);
 
   const handleCancel = useCallback(() => {
     dispatch({ type: "GO_BACK" });
@@ -48,23 +38,27 @@ export function PinChangeScreen() {
 
   const handleEnter = useCallback(async () => {
     if (phase === "current") {
-      if (currentPin.length < 4) {
+      if (pin.length < 4) {
         setError("PIN must be at least 4 digits");
         return;
       }
+      savedCurrentPin.current = pin;
+      setPin("");
       setPhase("new_pin");
       setError(null);
     } else if (phase === "new_pin") {
-      if (newPin.length < 4) {
+      if (pin.length < 4) {
         setError("PIN must be at least 4 digits");
         return;
       }
+      savedNewPin.current = pin;
+      setPin("");
       setPhase("confirm");
       setError(null);
     } else {
-      if (confirmPin !== newPin) {
+      if (pin !== savedNewPin.current) {
         setError("PINs do not match");
-        setConfirmPin("");
+        setPin("");
         return;
       }
 
@@ -73,27 +67,32 @@ export function PinChangeScreen() {
 
       try {
         await changePin({
-          current_pin: currentPin,
-          new_pin: newPin,
-          confirm_pin: confirmPin,
+          current_pin: savedCurrentPin.current,
+          new_pin: savedNewPin.current,
+          confirm_pin: pin,
         });
         setSuccess(true);
         dispatch({ type: "SET_LOADING", loading: false });
       } catch (err: unknown) {
         let message = "PIN change failed";
         if (axios.isAxiosError(err) && err.response?.data) {
-          const data = err.response.data as { detail?: string };
-          if (data.detail) message = data.detail;
+          const data = err.response.data as Record<string, unknown>;
+          if (typeof data.detail === "string") {
+            message = data.detail;
+          } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+            const first = data.detail[0] as { msg?: string };
+            message = (first.msg ?? message).replace(/^Value error, /i, "");
+          }
         }
         dispatch({ type: "SET_LOADING", loading: false });
         setError(message);
-        setCurrentPin("");
-        setNewPin("");
-        setConfirmPin("");
+        savedCurrentPin.current = "";
+        savedNewPin.current = "";
+        setPin("");
         setPhase("current");
       }
     }
-  }, [phase, currentPin, newPin, confirmPin, dispatch]);
+  }, [phase, pin, dispatch]);
 
   useLayoutEffect(() => {
     PinChangeScreen.keypadHandlers = {
@@ -149,7 +148,7 @@ export function PinChangeScreen() {
           {Array.from({ length: MAX_PIN_LENGTH }, (_, i) => (
             <span
               key={i}
-              className={`pin-dot ${i < activePin.length ? "pin-dot--filled" : ""}`}
+              className={`pin-dot ${i < pin.length ? "pin-dot--filled" : ""}`}
             />
           ))}
         </div>

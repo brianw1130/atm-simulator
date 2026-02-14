@@ -416,6 +416,55 @@ describe("DepositScreen", () => {
     });
     expect(screen.getByTestId("check-number-display")).toHaveTextContent("#9");
   });
+
+  it("handles Pydantic 422 validation error without crashing", async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: {
+        data: {
+          detail: [
+            {
+              type: "value_error",
+              loc: ["body", "amount_cents"],
+              msg: "Value error, Amount must be positive",
+            },
+          ],
+        },
+        status: 422,
+      },
+    };
+    mockDeposit.mockRejectedValue(axiosError);
+
+    const cashState = withState({
+      ...depositState,
+      pendingTransaction: {
+        type: "deposit",
+        amountCents: 0,
+        depositType: "cash",
+      },
+    });
+
+    render(
+      <TestProvider initialState={cashState}>
+        <DepositScreen />
+      </TestProvider>,
+    );
+
+    act(() => {
+      DepositScreen.keypadHandlers.onDigit("1");
+      DepositScreen.keypadHandlers.onDigit("0");
+      DepositScreen.keypadHandlers.onDigit("0");
+    });
+
+    await act(async () => {
+      DepositScreen.keypadHandlers.onEnter();
+    });
+
+    // Component should not crash — still renders deposit screen
+    await waitFor(() => {
+      expect(screen.getByTestId("deposit-screen")).toBeInTheDocument();
+    });
+  });
 });
 
 describe("DepositReceiptScreen", () => {

@@ -38,8 +38,13 @@ export function DepositScreen() {
       } catch (err: unknown) {
         let message = "Deposit failed";
         if (axios.isAxiosError(err) && err.response?.data) {
-          const data = err.response.data as { detail?: string };
-          if (data.detail) message = data.detail;
+          const data = err.response.data as Record<string, unknown>;
+          if (typeof data.detail === "string") {
+            message = data.detail;
+          } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+            const first = data.detail[0] as { msg?: string };
+            message = (first.msg ?? message).replace(/^Value error, /i, "");
+          }
         }
         dispatch({ type: "TRANSACTION_FAILURE", error: message });
       }

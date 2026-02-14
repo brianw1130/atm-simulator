@@ -218,4 +218,38 @@ describe("PinEntryScreen", () => {
     });
     expect(screen.getByTestId("pin-display").querySelectorAll(".pin-dot--filled")).toHaveLength(0);
   });
+
+  it("handles Pydantic 422 validation error (array detail)", async () => {
+    const { login } = await import("../../api/endpoints");
+    const mockLogin = login as ReturnType<typeof vi.fn>;
+    const axios = await import("axios");
+    vi.spyOn(axios.default, "isAxiosError").mockReturnValue(true);
+    mockLogin.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        data: {
+          detail: [
+            {
+              type: "value_error",
+              loc: ["body", "pin"],
+              msg: "Value error, PIN must be numeric",
+            },
+          ],
+        },
+        status: 422,
+      },
+    });
+
+    renderPinEntry();
+    act(() => {
+      PinEntryScreen.keypadHandlers.onDigit("1");
+      PinEntryScreen.keypadHandlers.onDigit("2");
+      PinEntryScreen.keypadHandlers.onDigit("3");
+      PinEntryScreen.keypadHandlers.onDigit("4");
+    });
+    await act(async () => {
+      await PinEntryScreen.keypadHandlers.onEnter();
+    });
+    expect(screen.getByTestId("pin-error")).toHaveTextContent("PIN must be numeric");
+  });
 });

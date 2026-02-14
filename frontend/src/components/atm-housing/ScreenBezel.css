@@ -82,8 +82,8 @@
 
 .screen-label-item {
   font-family: "Courier New", Courier, monospace;
-  font-size: 10px;
-  color: var(--screen-text-dim);
+  font-size: 13px;
+  color: var(--screen-text);
   white-space: nowrap;
   height: 28px;
   display: flex;

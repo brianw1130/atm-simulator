@@ -21,9 +21,9 @@
   background: linear-gradient(
     180deg,
     var(--side-btn-bg) 0%,
-    #3a3d42 100%
+    #5c6069 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 4px;
   cursor: pointer;
   box-shadow:
@@ -37,7 +37,7 @@
   background: linear-gradient(
     180deg,
     var(--side-btn-hover) 0%,
-    #4a4d52 100%
+    #6e7278 100%
   );
 }
 

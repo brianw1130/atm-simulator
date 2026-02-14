@@ -468,4 +468,96 @@ describe("PinChangeScreen", () => {
       .querySelectorAll(".pin-dot--filled");
     expect(filledDots).toHaveLength(1);
   });
+
+  it("resets pin dots when transitioning between phases", () => {
+    render(
+      <TestProvider initialState={pinChangeState}>
+        <PinChangeScreen />
+      </TestProvider>,
+    );
+    // Phase 1: enter 4 digits
+    act(() => {
+      PinChangeScreen.keypadHandlers.onDigit("1");
+      PinChangeScreen.keypadHandlers.onDigit("2");
+      PinChangeScreen.keypadHandlers.onDigit("3");
+      PinChangeScreen.keypadHandlers.onDigit("4");
+    });
+    expect(
+      screen.getByTestId("pin-display").querySelectorAll(".pin-dot--filled"),
+    ).toHaveLength(4);
+    // Transition to phase 2
+    act(() => {
+      PinChangeScreen.keypadHandlers.onEnter();
+    });
+    // Dots should reset to 0
+    expect(
+      screen.getByTestId("pin-display").querySelectorAll(".pin-dot--filled"),
+    ).toHaveLength(0);
+  });
+
+  it("handles Pydantic 422 validation error (array detail)", async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: {
+        data: {
+          detail: [
+            {
+              type: "value_error",
+              loc: ["body", "new_pin"],
+              msg: "Value error, PIN cannot be sequential digits",
+              input: "5678",
+            },
+          ],
+        },
+        status: 422,
+      },
+    };
+    mockChangePin.mockRejectedValue(axiosError);
+
+    render(
+      <TestProvider initialState={pinChangeState}>
+        <PinChangeScreen />
+      </TestProvider>,
+    );
+
+    // Phase 1: current
+    act(() => {
+      PinChangeScreen.keypadHandlers.onDigit("1");
+      PinChangeScreen.keypadHandlers.onDigit("2");
+      PinChangeScreen.keypadHandlers.onDigit("3");
+      PinChangeScreen.keypadHandlers.onDigit("4");
+    });
+    act(() => {
+      PinChangeScreen.keypadHandlers.onEnter();
+    });
+    // Phase 2: new
+    act(() => {
+      PinChangeScreen.keypadHandlers.onDigit("5");
+      PinChangeScreen.keypadHandlers.onDigit("6");
+      PinChangeScreen.keypadHandlers.onDigit("7");
+      PinChangeScreen.keypadHandlers.onDigit("8");
+    });
+    act(() => {
+      PinChangeScreen.keypadHandlers.onEnter();
+    });
+    // Phase 3: confirm (match)
+    act(() => {
+      PinChangeScreen.keypadHandlers.onDigit("5");
+      PinChangeScreen.keypadHandlers.onDigit("6");
+      PinChangeScreen.keypadHandlers.onDigit("7");
+      PinChangeScreen.keypadHandlers.onDigit("8");
+    });
+
+    await act(async () => {
+      await PinChangeScreen.keypadHandlers.onEnter();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pin-change-error")).toHaveTextContent(
+        "PIN cannot be sequential digits",
+      );
+    });
+    // Should reset to step 1
+    expect(screen.getByText(/Step 1\/3/)).toBeInTheDocument();
+  });
 });

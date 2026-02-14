@@ -10,10 +10,10 @@
 
 :root {
   /* ATM housing colors */
-  --atm-body: #3a3d42;
-  --atm-body-light: #52565c;
-  --atm-body-dark: #2a2c30;
-  --atm-bezel: #1a1c1e;
+  --atm-body: #5c6069;
+  --atm-body-light: #747980;
+  --atm-body-dark: #44474d;
+  --atm-bezel: #2a2d30;
 
   /* Screen colors */
   --screen-bg: #001a0a;
@@ -35,9 +35,9 @@
   --key-enter: #339933;
 
   /* Side button colors */
-  --side-btn-bg: #4a4d52;
-  --side-btn-hover: #5a5d62;
-  --side-btn-active: #3a3d42;
+  --side-btn-bg: #74787f;
+  --side-btn-hover: #8a8e95;
+  --side-btn-active: #5c6069;
 
   /* Sizing */
   --atm-width: 520px;
@@ -65,7 +65,7 @@ body {
     "Courier New",
     Courier,
     monospace;
-  background: #1a1a2e;
+  background: #2d2d44;
   display: flex;
   align-items: center;
   justify-content: center;

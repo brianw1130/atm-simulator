@@ -206,4 +206,39 @@ describe("StatementScreen", () => {
       );
     });
   });
+
+  it("handles Pydantic 422 validation error (array detail)", async () => {
+    const axiosError = {
+      isAxiosError: true,
+      response: {
+        data: {
+          detail: [
+            {
+              type: "value_error",
+              loc: ["body", "days"],
+              msg: "Value error, Days must be positive",
+            },
+          ],
+        },
+        status: 422,
+      },
+    };
+    mockGenerateStatement.mockRejectedValue(axiosError);
+
+    render(
+      <TestProvider initialState={statementState}>
+        <StatementScreen />
+      </TestProvider>,
+    );
+
+    await act(async () => {
+      await StatementScreen.handleGenerate(7);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("statement-error")).toHaveTextContent(
+        "Days must be positive",
+      );
+    });
+  });
 });
