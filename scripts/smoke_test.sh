@@ -45,23 +45,33 @@ check "GET /ready" "200" "${HTTP_CODE}"
 
 # Test 3: Auth login
 bold "[3/4] Auth Login"
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/api/v1/auth/login" \
+LOGIN_BODY=$(curl -s -X POST "${BASE_URL}/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"card_number": "1000-0001-0001", "pin": "1234"}')
-HTTP_CODE=$(echo "${RESPONSE}" | tail -1)
-BODY=$(echo "${RESPONSE}" | head -n -1)
-check "POST /api/v1/auth/login" "200" "${HTTP_CODE}"
+SESSION_ID=$(echo "${LOGIN_BODY}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || echo "")
+if [ -n "${SESSION_ID}" ]; then
+  check "POST /api/v1/auth/login" "200" "200"
+else
+  check "POST /api/v1/auth/login" "200" "401"
+fi
 
 # Test 4: Balance inquiry (requires session from login)
 bold "[4/4] Balance Inquiry"
-SESSION_TOKEN=$(echo "${BODY}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_token',''))" 2>/dev/null || echo "")
-if [ -n "${SESSION_TOKEN}" ]; then
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    "${BASE_URL}/api/v1/accounts/balance" \
-    -H "Authorization: Bearer ${SESSION_TOKEN}")
-  check "GET /api/v1/accounts/balance" "200" "${HTTP_CODE}"
+if [ -n "${SESSION_ID}" ]; then
+  # Get account list to find account ID, then check balance
+  ACCOUNTS_BODY=$(curl -s "${BASE_URL}/api/v1/accounts/" -H "X-Session-ID: ${SESSION_ID}")
+  ACCOUNT_ID=$(echo "${ACCOUNTS_BODY}" | python3 -c "import sys,json; print(json.load(sys.stdin)['accounts'][0]['id'])" 2>/dev/null || echo "")
+  if [ -n "${ACCOUNT_ID}" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+      "${BASE_URL}/api/v1/accounts/${ACCOUNT_ID}/balance" \
+      -H "X-Session-ID: ${SESSION_ID}")
+    check "GET /api/v1/accounts/{id}/balance" "200" "${HTTP_CODE}"
+  else
+    red "  SKIP: Could not extract account ID from accounts response"
+    FAIL=$((FAIL + 1))
+  fi
 else
-  red "  SKIP: Could not extract session token from login response"
+  red "  SKIP: Could not extract session_id from login response"
   FAIL=$((FAIL + 1))
 fi
 

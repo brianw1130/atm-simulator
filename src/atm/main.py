@@ -1,5 +1,6 @@
 """FastAPI application factory and startup configuration."""
 
+import logging
 import pathlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -19,11 +20,25 @@ from src.atm.middleware.rate_limit import limiter
 from src.atm.middleware.request_logging import RequestLoggingMiddleware
 from src.atm.services.redis_client import close_redis
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown events."""
-    # Startup — Redis is lazy-initialized on first use via get_redis()
+    # Startup — seed database with admin user and sample data (idempotent)
+    from src.atm.db.seed import seed_database
+    from src.atm.db.session import async_session_factory
+
+    async with async_session_factory() as session:
+        try:
+            await seed_database(session)
+            await session.commit()
+            logger.info("Database seeding completed successfully.")
+        except Exception:
+            await session.rollback()
+            logger.exception("Database seeding failed.")
+
     yield
     # Shutdown
     await close_redis()
