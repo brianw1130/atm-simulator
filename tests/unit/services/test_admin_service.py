@@ -11,11 +11,22 @@ Tests:
     - unfreeze_account: success, account not found
     - get_audit_logs: returns logs, filter by event_type, empty
     - create_admin_user: success, creates with hashed password
+    - get_all_customers: returns customers with account counts, empty DB
+    - get_customer_detail: found, not found
+    - create_customer: success, duplicate email
+    - update_customer: success, not found, duplicate email
+    - deactivate_customer: success, not found
+    - activate_customer: success, not found
+    - create_account: success, customer not found
+    - update_account: success, not found
+    - close_account: success, non-zero balance, not found
+    - admin_reset_pin: success, not found, weak pin
 """
 
 import json
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.config import settings
@@ -24,18 +35,28 @@ from src.atm.models.audit import AuditEventType, AuditLog
 from src.atm.services.admin_service import (
     ADMIN_SESSION_PREFIX,
     AdminAuthError,
+    activate_customer,
     admin_logout,
+    admin_reset_pin,
     authenticate_admin,
+    close_account,
+    create_account,
     create_admin_user,
+    create_customer,
+    deactivate_customer,
     freeze_account,
     get_all_accounts,
+    get_all_customers,
     get_audit_logs,
+    get_customer_detail,
     unfreeze_account,
+    update_account,
+    update_customer,
     validate_admin_session,
 )
 from src.atm.services.redis_client import get_redis
 from src.atm.utils.security import verify_pin
-from tests.factories import create_test_account, create_test_customer
+from tests.factories import create_test_account, create_test_card, create_test_customer
 
 pytestmark = pytest.mark.asyncio
 
@@ -329,3 +350,479 @@ class TestCreateAdminUser:
         await db_session.commit()
 
         assert admin.role == "superadmin"
+
+
+# ===========================================================================
+# get_all_customers
+# ===========================================================================
+
+
+class TestGetAllCustomers:
+    async def test_returns_customers_with_account_counts(self, db_session: AsyncSession) -> None:
+        """Returns a list of customer dicts including account_count."""
+        customer = await create_test_customer(
+            db_session, first_name="Alice", last_name="Johnson", email="alice@test.com"
+        )
+        await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-0001-0001"
+        )
+        await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-0001-0002",
+            account_type=AccountType.SAVINGS,
+        )
+        await db_session.commit()
+
+        customers = await get_all_customers(db_session)
+        assert len(customers) == 1
+        assert customers[0]["first_name"] == "Alice"
+        assert customers[0]["account_count"] == 2
+        assert customers[0]["is_active"] is True
+        assert customers[0]["date_of_birth"] is not None
+
+    async def test_empty_database_returns_empty_list(self, db_session: AsyncSession) -> None:
+        """No customers returns an empty list."""
+        customers = await get_all_customers(db_session)
+        assert customers == []
+
+
+# ===========================================================================
+# get_customer_detail
+# ===========================================================================
+
+
+class TestGetCustomerDetail:
+    async def test_returns_customer_with_accounts_and_cards(self, db_session: AsyncSession) -> None:
+        """Returns full customer detail including accounts and cards."""
+        customer = await create_test_customer(
+            db_session, first_name="Alice", last_name="Johnson", email="alice@test.com"
+        )
+        account = await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-0001-0001"
+        )
+        await create_test_card(db_session, account_id=account.id, card_number="1000-0001-0001")
+        await db_session.commit()
+
+        detail = await get_customer_detail(db_session, customer.id)
+        assert detail is not None
+        assert detail["first_name"] == "Alice"
+        assert detail["account_count"] == 1
+        assert len(detail["accounts"]) == 1
+        assert detail["accounts"][0]["account_number"] == "1000-0001-0001"
+        assert len(detail["accounts"][0]["cards"]) == 1
+        assert detail["accounts"][0]["cards"][0]["card_number"] == "1000-0001-0001"
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent customer ID returns None."""
+        detail = await get_customer_detail(db_session, 99999)
+        assert detail is None
+
+
+# ===========================================================================
+# create_customer
+# ===========================================================================
+
+
+class TestCreateCustomer:
+    async def test_creates_customer_successfully(self, db_session: AsyncSession) -> None:
+        """Creates a customer and returns the data dict."""
+        from datetime import date
+
+        data = {
+            "first_name": "New",
+            "last_name": "Customer",
+            "date_of_birth": date(1985, 3, 20),
+            "email": "new@example.com",
+            "phone": "555-9999",
+        }
+        result = await create_customer(db_session, data)
+        await db_session.commit()
+
+        assert result["first_name"] == "New"
+        assert result["last_name"] == "Customer"
+        assert result["email"] == "new@example.com"
+        assert result["phone"] == "555-9999"
+        assert result["is_active"] is True
+        assert result["account_count"] == 0
+
+        # Verify audit log was created
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.CUSTOMER_CREATED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+        assert log.details["email"] == "new@example.com"
+
+    async def test_duplicate_email_raises_value_error(self, db_session: AsyncSession) -> None:
+        """Creating a customer with an existing email raises ValueError."""
+        await create_test_customer(db_session, email="taken@example.com")
+        await db_session.commit()
+
+        from datetime import date
+
+        data = {
+            "first_name": "Another",
+            "last_name": "Person",
+            "date_of_birth": date(1990, 1, 1),
+            "email": "taken@example.com",
+        }
+        with pytest.raises(ValueError, match="email already exists"):
+            await create_customer(db_session, data)
+
+    async def test_creates_customer_without_phone(self, db_session: AsyncSession) -> None:
+        """Creates a customer without an optional phone."""
+        from datetime import date
+
+        data = {
+            "first_name": "No",
+            "last_name": "Phone",
+            "date_of_birth": date(1990, 1, 1),
+            "email": "nophone@example.com",
+        }
+        result = await create_customer(db_session, data)
+        assert result["phone"] is None
+
+
+# ===========================================================================
+# update_customer
+# ===========================================================================
+
+
+class TestUpdateCustomer:
+    async def test_updates_customer_fields(self, db_session: AsyncSession) -> None:
+        """Updates specified fields and returns the updated dict."""
+        customer = await create_test_customer(
+            db_session, first_name="Old", last_name="Name", email="old@example.com"
+        )
+        await db_session.commit()
+
+        result = await update_customer(
+            db_session, customer.id, {"first_name": "New", "last_name": "Name2"}
+        )
+        assert result is not None
+        assert result["first_name"] == "New"
+        assert result["last_name"] == "Name2"
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent customer ID returns None."""
+        result = await update_customer(db_session, 99999, {"first_name": "X"})
+        assert result is None
+
+    async def test_duplicate_email_raises_value_error(self, db_session: AsyncSession) -> None:
+        """Changing email to one that belongs to another customer raises ValueError."""
+        await create_test_customer(db_session, email="taken@example.com")
+        customer = await create_test_customer(db_session, email="mine@example.com")
+        await db_session.commit()
+
+        with pytest.raises(ValueError, match="email already exists"):
+            await update_customer(db_session, customer.id, {"email": "taken@example.com"})
+
+    async def test_same_email_allowed(self, db_session: AsyncSession) -> None:
+        """Updating with the same email the customer already has doesn't raise."""
+        customer = await create_test_customer(db_session, email="keep@example.com")
+        await db_session.commit()
+
+        result = await update_customer(
+            db_session, customer.id, {"email": "keep@example.com", "first_name": "Updated"}
+        )
+        assert result is not None
+        assert result["first_name"] == "Updated"
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Updating a customer creates an audit log entry."""
+        customer = await create_test_customer(db_session, email="audit@example.com")
+        await db_session.commit()
+
+        await update_customer(db_session, customer.id, {"first_name": "Audited"})
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.CUSTOMER_UPDATED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+
+
+# ===========================================================================
+# deactivate_customer / activate_customer
+# ===========================================================================
+
+
+class TestDeactivateCustomer:
+    async def test_deactivates_customer(self, db_session: AsyncSession) -> None:
+        """Sets is_active=False and returns confirmation."""
+        customer = await create_test_customer(db_session, first_name="Active")
+        await db_session.commit()
+
+        result = await deactivate_customer(db_session, customer.id)
+        assert result is not None
+        assert "deactivated" in result["message"].lower()
+
+        await db_session.refresh(customer)
+        assert customer.is_active is False
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent customer ID returns None."""
+        result = await deactivate_customer(db_session, 99999)
+        assert result is None
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Deactivating a customer creates an audit log entry."""
+        customer = await create_test_customer(db_session)
+        await db_session.commit()
+
+        await deactivate_customer(db_session, customer.id)
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.CUSTOMER_DEACTIVATED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+
+
+class TestActivateCustomer:
+    async def test_activates_customer(self, db_session: AsyncSession) -> None:
+        """Sets is_active=True and returns confirmation."""
+        customer = await create_test_customer(db_session, is_active=False)
+        await db_session.commit()
+
+        result = await activate_customer(db_session, customer.id)
+        assert result is not None
+        assert "activated" in result["message"].lower()
+
+        await db_session.refresh(customer)
+        assert customer.is_active is True
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent customer ID returns None."""
+        result = await activate_customer(db_session, 99999)
+        assert result is None
+
+
+# ===========================================================================
+# create_account
+# ===========================================================================
+
+
+class TestCreateAccount:
+    async def test_creates_account_with_card(self, db_session: AsyncSession) -> None:
+        """Creates an account and an associated ATM card."""
+        customer = await create_test_customer(db_session, email="acct@example.com")
+        await db_session.commit()
+
+        data = {"account_type": "CHECKING", "initial_balance_cents": 100_000}
+        result = await create_account(db_session, customer.id, data)
+        await db_session.commit()
+
+        assert result["account_type"] == "CHECKING"
+        assert result["balance"] == "$1,000.00"
+        assert result["status"] == "ACTIVE"
+        assert len(result["cards"]) == 1
+        assert result["account_number"].startswith("1000-")
+
+    async def test_creates_savings_with_zero_balance(self, db_session: AsyncSession) -> None:
+        """Creates a savings account with zero initial balance."""
+        customer = await create_test_customer(db_session, email="sav@example.com")
+        await db_session.commit()
+
+        data = {"account_type": "SAVINGS", "initial_balance_cents": 0}
+        result = await create_account(db_session, customer.id, data)
+        assert result["account_type"] == "SAVINGS"
+        assert result["balance"] == "$0.00"
+
+    async def test_customer_not_found_raises_value_error(self, db_session: AsyncSession) -> None:
+        """Creating an account for a nonexistent customer raises ValueError."""
+        data = {"account_type": "CHECKING", "initial_balance_cents": 0}
+        with pytest.raises(ValueError, match="Customer not found"):
+            await create_account(db_session, 99999, data)
+
+    async def test_auto_increments_account_number(self, db_session: AsyncSession) -> None:
+        """Second account for the same customer gets an incremented account number."""
+        customer = await create_test_customer(db_session, email="multi@example.com")
+        await db_session.commit()
+
+        data1 = {"account_type": "CHECKING", "initial_balance_cents": 0}
+        result1 = await create_account(db_session, customer.id, data1)
+        await db_session.commit()
+
+        data2 = {"account_type": "SAVINGS", "initial_balance_cents": 0}
+        result2 = await create_account(db_session, customer.id, data2)
+
+        # Second account should have incremented sequence
+        num1 = result1["account_number"]
+        num2 = result2["account_number"]
+        assert num1 != num2
+        # Both should share the customer segment
+        assert num1.split("-")[1] == num2.split("-")[1]
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Creating an account creates an audit log entry."""
+        customer = await create_test_customer(db_session, email="audit_acct@example.com")
+        await db_session.commit()
+
+        data = {"account_type": "CHECKING", "initial_balance_cents": 50000}
+        await create_account(db_session, customer.id, data)
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.ACCOUNT_CREATED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+        assert log.details["initial_balance_cents"] == 50000
+
+
+# ===========================================================================
+# update_account
+# ===========================================================================
+
+
+class TestUpdateAccount:
+    async def test_updates_account(self, db_session: AsyncSession) -> None:
+        """Updates account and returns dict."""
+        customer = await create_test_customer(db_session, email="upd_acct@example.com")
+        account = await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-9001-0001"
+        )
+        await db_session.commit()
+
+        result = await update_account(
+            db_session, account.id, {"daily_withdrawal_limit_cents": 100000}
+        )
+        assert result is not None
+        assert result["id"] == account.id
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent account ID returns None."""
+        result = await update_account(db_session, 99999, {})
+        assert result is None
+
+
+# ===========================================================================
+# close_account
+# ===========================================================================
+
+
+class TestCloseAccount:
+    async def test_closes_zero_balance_account(self, db_session: AsyncSession) -> None:
+        """Closes an account with zero balance."""
+        customer = await create_test_customer(db_session, email="close@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8001-0001",
+            balance_cents=0,
+        )
+        await db_session.commit()
+
+        result = await close_account(db_session, account.id)
+        assert result is not None
+        assert "closed" in result["message"].lower()
+
+        stmt = select(Account).where(Account.id == account.id)
+        row = (await db_session.execute(stmt)).scalars().first()
+        assert row is not None
+        assert row.status == AccountStatus.CLOSED
+
+    async def test_non_zero_balance_raises_value_error(self, db_session: AsyncSession) -> None:
+        """Cannot close an account with a non-zero balance."""
+        customer = await create_test_customer(db_session, email="noclose@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8002-0001",
+            balance_cents=50000,
+        )
+        await db_session.commit()
+
+        with pytest.raises(ValueError, match="non-zero balance"):
+            await close_account(db_session, account.id)
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent account ID returns None."""
+        result = await close_account(db_session, 99999)
+        assert result is None
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Closing an account creates an audit log entry."""
+        customer = await create_test_customer(db_session, email="closelog@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-8003-0001",
+            balance_cents=0,
+        )
+        await db_session.commit()
+
+        await close_account(db_session, account.id)
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.ACCOUNT_CLOSED)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+
+
+# ===========================================================================
+# admin_reset_pin
+# ===========================================================================
+
+
+class TestAdminResetPin:
+    async def test_resets_pin_successfully(self, db_session: AsyncSession) -> None:
+        """Resets the card PIN, clears failed_attempts and locked_until."""
+        customer = await create_test_customer(db_session, email="pin@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-7001-0001",
+        )
+        card = await create_test_card(
+            db_session,
+            account_id=account.id,
+            card_number="1000-7001-0001",
+            pin="5678",
+            failed_attempts=3,
+        )
+        await db_session.commit()
+
+        result = await admin_reset_pin(db_session, card.id, "4829")
+        assert result is not None
+        assert "reset" in result["message"].lower()
+
+        await db_session.refresh(card)
+        assert card.failed_attempts == 0
+        assert card.locked_until is None
+        assert verify_pin("4829", card.pin_hash, settings.pin_pepper)
+
+    async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
+        """Nonexistent card ID returns None."""
+        result = await admin_reset_pin(db_session, 99999, "4829")
+        assert result is None
+
+    async def test_weak_pin_raises_value_error(self, db_session: AsyncSession) -> None:
+        """A PIN that fails complexity validation raises ValueError."""
+        with pytest.raises(ValueError, match="same digit"):
+            await admin_reset_pin(db_session, 1, "1111")
+
+    async def test_sequential_pin_raises_value_error(self, db_session: AsyncSession) -> None:
+        """A sequential PIN raises ValueError."""
+        with pytest.raises(ValueError, match="sequential"):
+            await admin_reset_pin(db_session, 1, "1234")
+
+    async def test_audit_log_created(self, db_session: AsyncSession) -> None:
+        """Resetting a PIN creates an audit log entry."""
+        customer = await create_test_customer(db_session, email="pinlog@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-7002-0001",
+        )
+        card = await create_test_card(
+            db_session,
+            account_id=account.id,
+            card_number="1000-7002-0001",
+            pin="5678",
+        )
+        await db_session.commit()
+
+        await admin_reset_pin(db_session, card.id, "4829")
+        await db_session.commit()
+
+        stmt = select(AuditLog).where(AuditLog.event_type == AuditEventType.PIN_RESET_ADMIN)
+        log = (await db_session.execute(stmt)).scalars().first()
+        assert log is not None
+        assert log.details["card_id"] == card.id

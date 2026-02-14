@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.atm.config import settings
-from src.atm.models.account import Account, AccountStatus
+from src.atm.models.account import Account, AccountStatus, AccountType
 from src.atm.models.admin import AdminUser
 from src.atm.models.audit import AuditEventType, AuditLog
+from src.atm.models.card import ATMCard
+from src.atm.models.customer import Customer
+from src.atm.services.audit_service import log_event
 from src.atm.services.redis_client import get_redis
-from src.atm.utils.security import hash_pin, verify_pin
+from src.atm.utils.security import hash_pin, validate_pin_complexity, verify_pin
 
 ADMIN_SESSION_PREFIX = "admin_session:"
 ADMIN_SESSION_TTL = 1800  # 30 minutes
@@ -270,3 +273,502 @@ async def create_admin_user(
     session.add(admin)
     await session.flush()
     return admin
+
+
+# ---------------------------------------------------------------------------
+# Customer CRUD
+# ---------------------------------------------------------------------------
+
+
+async def get_all_customers(session: AsyncSession) -> list[dict[str, Any]]:
+    """Get all customers with account counts.
+
+    Args:
+        session: Async database session.
+
+    Returns:
+        List of customer dicts with account_count.
+    """
+    stmt = select(Customer).options(selectinload(Customer.accounts)).order_by(Customer.id)
+    result = await session.execute(stmt)
+    customers = result.scalars().all()
+    return [
+        {
+            "id": c.id,
+            "first_name": c.first_name,
+            "last_name": c.last_name,
+            "email": c.email,
+            "phone": c.phone,
+            "date_of_birth": c.date_of_birth.isoformat() if c.date_of_birth else None,
+            "is_active": c.is_active,
+            "account_count": len(c.accounts),
+        }
+        for c in customers
+    ]
+
+
+async def get_customer_detail(session: AsyncSession, customer_id: int) -> dict[str, Any] | None:
+    """Get customer detail with accounts and cards.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer.
+
+    Returns:
+        Customer detail dict, or None if not found.
+    """
+    stmt = (
+        select(Customer)
+        .where(Customer.id == customer_id)
+        .options(
+            selectinload(Customer.accounts).selectinload(Account.cards),
+        )
+    )
+    result = await session.execute(stmt)
+    customer = result.scalars().first()
+    if customer is None:
+        return None
+
+    accounts = []
+    for a in customer.accounts:
+        cards = [
+            {
+                "id": card.id,
+                "card_number": card.card_number,
+                "is_active": card.is_active,
+                "failed_attempts": card.failed_attempts,
+                "is_locked": card.is_locked,
+            }
+            for card in a.cards
+        ]
+        accounts.append(
+            {
+                "id": a.id,
+                "account_number": a.account_number,
+                "account_type": a.account_type.value,
+                "balance": f"${a.balance_cents / 100:,.2f}",
+                "available_balance": f"${a.available_balance_cents / 100:,.2f}",
+                "status": a.status.value,
+                "cards": cards,
+            }
+        )
+
+    return {
+        "id": customer.id,
+        "first_name": customer.first_name,
+        "last_name": customer.last_name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "date_of_birth": (customer.date_of_birth.isoformat() if customer.date_of_birth else None),
+        "is_active": customer.is_active,
+        "account_count": len(customer.accounts),
+        "accounts": accounts,
+    }
+
+
+async def create_customer(
+    session: AsyncSession,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new customer.
+
+    Args:
+        session: Async database session.
+        data: Validated customer data from CustomerCreateRequest.
+
+    Returns:
+        Created customer dict.
+
+    Raises:
+        ValueError: If email already exists.
+    """
+    existing = await session.execute(select(Customer).where(Customer.email == data["email"]))
+    if existing.scalars().first() is not None:
+        raise ValueError("A customer with this email already exists")
+
+    customer = Customer(
+        first_name=data["first_name"],
+        last_name=data["last_name"],
+        date_of_birth=data["date_of_birth"],
+        email=data["email"],
+        phone=data.get("phone"),
+    )
+    session.add(customer)
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.CUSTOMER_CREATED,
+        details={"customer_id": customer.id, "email": customer.email},
+    )
+
+    return {
+        "id": customer.id,
+        "first_name": customer.first_name,
+        "last_name": customer.last_name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "date_of_birth": (customer.date_of_birth.isoformat() if customer.date_of_birth else None),
+        "is_active": customer.is_active,
+        "account_count": 0,
+    }
+
+
+async def update_customer(
+    session: AsyncSession,
+    customer_id: int,
+    data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Update an existing customer's fields.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer to update.
+        data: Dict of fields to update (only non-None values).
+
+    Returns:
+        Updated customer dict, or None if not found.
+
+    Raises:
+        ValueError: If new email already belongs to another customer.
+    """
+    stmt = (
+        select(Customer).where(Customer.id == customer_id).options(selectinload(Customer.accounts))
+    )
+    result = await session.execute(stmt)
+    customer = result.scalars().first()
+    if customer is None:
+        return None
+
+    if "email" in data and data["email"] is not None and data["email"] != customer.email:
+        existing = await session.execute(
+            select(Customer).where(Customer.email == data["email"], Customer.id != customer_id)
+        )
+        if existing.scalars().first() is not None:
+            raise ValueError("A customer with this email already exists")
+
+    for field, value in data.items():
+        if value is not None:
+            setattr(customer, field, value)
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.CUSTOMER_UPDATED,
+        details={"customer_id": customer.id, "updated_fields": list(data.keys())},
+    )
+
+    return {
+        "id": customer.id,
+        "first_name": customer.first_name,
+        "last_name": customer.last_name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "date_of_birth": (customer.date_of_birth.isoformat() if customer.date_of_birth else None),
+        "is_active": customer.is_active,
+        "account_count": len(customer.accounts),
+    }
+
+
+async def deactivate_customer(session: AsyncSession, customer_id: int) -> dict[str, str] | None:
+    """Soft-delete a customer by setting is_active=False.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer to deactivate.
+
+    Returns:
+        Confirmation message dict, or None if not found.
+    """
+    result = await session.execute(select(Customer).where(Customer.id == customer_id))
+    customer = result.scalars().first()
+    if customer is None:
+        return None
+    customer.is_active = False
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.CUSTOMER_DEACTIVATED,
+        details={"customer_id": customer.id},
+    )
+
+    return {"message": f"Customer {customer.full_name} deactivated"}
+
+
+async def activate_customer(session: AsyncSession, customer_id: int) -> dict[str, str] | None:
+    """Reactivate a customer by setting is_active=True.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer to activate.
+
+    Returns:
+        Confirmation message dict, or None if not found.
+    """
+    result = await session.execute(select(Customer).where(Customer.id == customer_id))
+    customer = result.scalars().first()
+    if customer is None:
+        return None
+    customer.is_active = True
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.CUSTOMER_ACTIVATED,
+        details={"customer_id": customer.id},
+    )
+
+    return {"message": f"Customer {customer.full_name} activated"}
+
+
+# ---------------------------------------------------------------------------
+# Account CRUD
+# ---------------------------------------------------------------------------
+
+
+async def _generate_account_number(session: AsyncSession, customer_id: int) -> str:
+    """Generate the next account number for a customer.
+
+    Pattern: 1000-CCCC-SSSS where CCCC is the customer segment and SSSS
+    is the per-customer account sequence.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer.
+
+    Returns:
+        Generated account number string.
+    """
+    # Use the underlying table to avoid ORM mapper hooks (e.g. the test
+    # conftest's ``do_orm_execute`` listener that adds ``selectinload``
+    # options — those are invalid for column-level queries).
+    t = Account.__table__
+    stmt = (
+        select(t.c.account_number)
+        .where(t.c.customer_id == customer_id)
+        .order_by(t.c.account_number.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    max_num = result.scalar()
+
+    if max_num is not None:
+        # Parse the last segment and increment
+        parts = max_num.split("-")
+        next_seq = int(parts[2]) + 1
+        customer_segment = parts[1]
+    else:
+        # First account for this customer — derive customer segment from ID
+        customer_segment = f"{customer_id:04d}"
+        next_seq = 1
+
+    return f"1000-{customer_segment}-{next_seq:04d}"
+
+
+async def create_account(
+    session: AsyncSession,
+    customer_id: int,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new account for a customer.
+
+    Also creates an ATM card for the account with a default PIN of "1234"
+    that should be changed immediately.
+
+    Args:
+        session: Async database session.
+        customer_id: ID of the customer.
+        data: Validated account data from AccountCreateRequest.
+
+    Returns:
+        Created account dict.
+
+    Raises:
+        ValueError: If customer not found.
+    """
+    result = await session.execute(select(Customer).where(Customer.id == customer_id))
+    customer = result.scalars().first()
+    if customer is None:
+        raise ValueError("Customer not found")
+
+    account_number = await _generate_account_number(session, customer_id)
+    initial_balance = data.get("initial_balance_cents", 0)
+
+    account = Account(
+        customer_id=customer_id,
+        account_number=account_number,
+        account_type=AccountType(data["account_type"]),
+        balance_cents=initial_balance,
+        available_balance_cents=initial_balance,
+        status=AccountStatus.ACTIVE,
+    )
+    session.add(account)
+    await session.flush()
+
+    # Create an ATM card with a default PIN
+    default_pin = "1357"
+    card = ATMCard(
+        account_id=account.id,
+        card_number=account_number,
+        pin_hash=hash_pin(default_pin, settings.pin_pepper),
+    )
+    session.add(card)
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.ACCOUNT_CREATED,
+        account_id=account.id,
+        details={
+            "customer_id": customer_id,
+            "account_number": account_number,
+            "account_type": data["account_type"],
+            "initial_balance_cents": initial_balance,
+        },
+    )
+
+    return {
+        "id": account.id,
+        "account_number": account.account_number,
+        "account_type": account.account_type.value,
+        "balance": f"${account.balance_cents / 100:,.2f}",
+        "available_balance": f"${account.available_balance_cents / 100:,.2f}",
+        "status": account.status.value,
+        "cards": [
+            {
+                "id": card.id,
+                "card_number": card.card_number,
+                "is_active": card.is_active,
+                "failed_attempts": card.failed_attempts,
+                "is_locked": card.is_locked,
+            }
+        ],
+    }
+
+
+async def update_account(
+    session: AsyncSession,
+    account_id: int,
+    data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Update account limit overrides.
+
+    Args:
+        session: Async database session.
+        account_id: ID of the account to update.
+        data: Dict with optional daily_withdrawal_limit_cents and daily_transfer_limit_cents.
+
+    Returns:
+        Updated account dict, or None if not found.
+    """
+    result = await session.execute(select(Account).where(Account.id == account_id))
+    account = result.scalars().first()
+    if account is None:
+        return None
+
+    updated_fields = []
+    if data.get("daily_withdrawal_limit_cents") is not None:
+        updated_fields.append("daily_withdrawal_limit_cents")
+    if data.get("daily_transfer_limit_cents") is not None:
+        updated_fields.append("daily_transfer_limit_cents")
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.ACCOUNT_UPDATED,
+        account_id=account.id,
+        details={"updated_fields": updated_fields},
+    )
+
+    return {
+        "id": account.id,
+        "account_number": account.account_number,
+        "account_type": account.account_type.value,
+        "balance": f"${account.balance_cents / 100:,.2f}",
+        "available_balance": f"${account.available_balance_cents / 100:,.2f}",
+        "status": account.status.value,
+    }
+
+
+async def close_account(session: AsyncSession, account_id: int) -> dict[str, str] | None:
+    """Close an account (balance must be zero).
+
+    Args:
+        session: Async database session.
+        account_id: ID of the account to close.
+
+    Returns:
+        Confirmation message dict, or None if not found.
+
+    Raises:
+        ValueError: If account balance is not zero.
+    """
+    result = await session.execute(select(Account).where(Account.id == account_id))
+    account = result.scalars().first()
+    if account is None:
+        return None
+
+    if account.balance_cents != 0:
+        raise ValueError(
+            f"Cannot close account with non-zero balance (${account.balance_cents / 100:,.2f})"
+        )
+
+    account.status = AccountStatus.CLOSED
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.ACCOUNT_CLOSED,
+        account_id=account.id,
+        details={"account_number": account.account_number},
+    )
+
+    return {"message": f"Account {account.account_number} closed"}
+
+
+# ---------------------------------------------------------------------------
+# PIN Management
+# ---------------------------------------------------------------------------
+
+
+async def admin_reset_pin(
+    session: AsyncSession,
+    card_id: int,
+    new_pin: str,
+) -> dict[str, str] | None:
+    """Admin-initiated PIN reset.
+
+    Args:
+        session: Async database session.
+        card_id: ID of the ATM card.
+        new_pin: The new plaintext PIN (already validated by schema).
+
+    Returns:
+        Confirmation message dict, or None if card not found.
+
+    Raises:
+        ValueError: If PIN fails complexity validation.
+    """
+    is_valid, message = validate_pin_complexity(new_pin)
+    if not is_valid:
+        raise ValueError(message)
+
+    result = await session.execute(select(ATMCard).where(ATMCard.id == card_id))
+    card = result.scalars().first()
+    if card is None:
+        return None
+
+    card.pin_hash = hash_pin(new_pin, settings.pin_pepper)
+    card.failed_attempts = 0
+    card.locked_until = None
+    await session.flush()
+
+    await log_event(
+        session,
+        AuditEventType.PIN_RESET_ADMIN,
+        account_id=card.account_id,
+        details={"card_id": card.id},
+    )
+
+    return {"message": f"PIN reset for card {card.card_number}"}

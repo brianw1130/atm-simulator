@@ -1,7 +1,7 @@
 """Integration tests for admin API endpoints.
 
 Tests cover: login, logout, account listing, freeze/unfreeze, audit logs,
-and maintenance mode.
+maintenance mode, customer CRUD, account CRUD, and PIN reset.
 """
 
 import pytest
@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.models.audit import AuditEventType, AuditLog
 from src.atm.services.admin_service import create_admin_user
-from tests.factories import create_test_account, create_test_customer
+from tests.factories import (
+    create_test_account,
+    create_test_card,
+    create_test_customer,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -276,4 +280,477 @@ class TestListAuditLogs:
     ) -> None:
         """Unauthenticated request returns 401."""
         resp = await client.get("/admin/api/audit-logs")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# GET /admin/api/customers
+# ===========================================================================
+
+
+class TestListCustomers:
+    async def test_returns_customers(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can list all customers."""
+        await _create_admin(db_session)
+        await create_test_customer(
+            db_session, first_name="Alice", last_name="Johnson", email="alice@test.com"
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.get("/admin/api/customers", cookies=cookies)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert data[0]["first_name"] == "Alice"
+
+    async def test_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated request returns 401."""
+        resp = await client.get("/admin/api/customers")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# GET /admin/api/customers/{id}
+# ===========================================================================
+
+
+class TestGetCustomerDetail:
+    async def test_returns_customer_detail(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Authenticated admin can get customer detail."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(
+            db_session, first_name="Alice", last_name="Johnson", email="alice@test.com"
+        )
+        account = await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-0001-0001"
+        )
+        await create_test_card(db_session, account_id=account.id, card_number="1000-0001-0001")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.get(f"/admin/api/customers/{customer.id}", cookies=cookies)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["first_name"] == "Alice"
+        assert len(data["accounts"]) == 1
+        assert len(data["accounts"][0]["cards"]) == 1
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent customer returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.get("/admin/api/customers/99999", cookies=cookies)
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# POST /admin/api/customers
+# ===========================================================================
+
+
+class TestCreateCustomerEndpoint:
+    async def test_creates_customer(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can create a customer."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        resp = await client.post(
+            "/admin/api/customers",
+            json={
+                "first_name": "New",
+                "last_name": "Person",
+                "date_of_birth": "1990-05-15",
+                "email": "new@example.com",
+                "phone": "555-0101",
+            },
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["first_name"] == "New"
+        assert data["email"] == "new@example.com"
+        assert data["account_count"] == 0
+
+    async def test_duplicate_email_returns_409(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Creating a customer with a duplicate email returns 409."""
+        await _create_admin(db_session)
+        await create_test_customer(db_session, email="taken@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(
+            "/admin/api/customers",
+            json={
+                "first_name": "Dup",
+                "last_name": "Email",
+                "date_of_birth": "1990-01-01",
+                "email": "taken@example.com",
+            },
+            cookies=cookies,
+        )
+        assert resp.status_code == 409
+
+    async def test_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated request returns 401."""
+        resp = await client.post(
+            "/admin/api/customers",
+            json={
+                "first_name": "No",
+                "last_name": "Auth",
+                "date_of_birth": "1990-01-01",
+                "email": "no@example.com",
+            },
+        )
+        assert resp.status_code == 401
+
+    async def test_invalid_body_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Invalid request body returns 422."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        resp = await client.post(
+            "/admin/api/customers",
+            json={"first_name": "Only"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+
+# ===========================================================================
+# PUT /admin/api/customers/{id}
+# ===========================================================================
+
+
+class TestUpdateCustomerEndpoint:
+    async def test_updates_customer(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can update a customer."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, first_name="Old", email="upd@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.put(
+            f"/admin/api/customers/{customer.id}",
+            json={"first_name": "New"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["first_name"] == "New"
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent customer returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.put(
+            "/admin/api/customers/99999",
+            json={"first_name": "X"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 404
+
+    async def test_duplicate_email_returns_409(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Changing email to a duplicate returns 409."""
+        await _create_admin(db_session)
+        await create_test_customer(db_session, email="taken2@example.com")
+        customer = await create_test_customer(db_session, email="mine2@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.put(
+            f"/admin/api/customers/{customer.id}",
+            json={"email": "taken2@example.com"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 409
+
+
+# ===========================================================================
+# POST /admin/api/customers/{id}/deactivate + activate
+# ===========================================================================
+
+
+class TestDeactivateCustomerEndpoint:
+    async def test_deactivates_customer(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Authenticated admin can deactivate a customer."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="deact@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(f"/admin/api/customers/{customer.id}/deactivate", cookies=cookies)
+        assert resp.status_code == 200
+        assert "deactivated" in resp.json()["message"].lower()
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent customer returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.post("/admin/api/customers/99999/deactivate", cookies=cookies)
+        assert resp.status_code == 404
+
+
+class TestActivateCustomerEndpoint:
+    async def test_activates_customer(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can reactivate a customer."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, is_active=False, email="act@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(f"/admin/api/customers/{customer.id}/activate", cookies=cookies)
+        assert resp.status_code == 200
+        assert "activated" in resp.json()["message"].lower()
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent customer returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.post("/admin/api/customers/99999/activate", cookies=cookies)
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# POST /admin/api/customers/{id}/accounts
+# ===========================================================================
+
+
+class TestCreateAccountEndpoint:
+    async def test_creates_account(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can create an account for a customer."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="newacct@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(
+            f"/admin/api/customers/{customer.id}/accounts",
+            json={"account_type": "CHECKING", "initial_balance_cents": 50000},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["account_type"] == "CHECKING"
+        assert data["balance"] == "$500.00"
+        assert len(data["cards"]) == 1
+
+    async def test_customer_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Creating account for nonexistent customer returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+
+        resp = await client.post(
+            "/admin/api/customers/99999/accounts",
+            json={"account_type": "CHECKING"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 404
+
+    async def test_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated request returns 401."""
+        resp = await client.post(
+            "/admin/api/customers/1/accounts",
+            json={"account_type": "CHECKING"},
+        )
+        assert resp.status_code == 401
+
+    async def test_invalid_type_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Invalid account type returns 422."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="badtype@example.com")
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(
+            f"/admin/api/customers/{customer.id}/accounts",
+            json={"account_type": "INVALID"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+
+# ===========================================================================
+# PUT /admin/api/accounts/{id}
+# ===========================================================================
+
+
+class TestUpdateAccountEndpoint:
+    async def test_updates_account(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can update account limits."""
+        await _create_admin(db_session)
+        account_id = await _seed_account(db_session)
+        cookies = await _login(client)
+
+        resp = await client.put(
+            f"/admin/api/accounts/{account_id}",
+            json={"daily_withdrawal_limit_cents": 100000},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["id"] == account_id
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent account returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.put(
+            "/admin/api/accounts/99999",
+            json={"daily_withdrawal_limit_cents": 100000},
+            cookies=cookies,
+        )
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# POST /admin/api/accounts/{id}/close
+# ===========================================================================
+
+
+class TestCloseAccountEndpoint:
+    async def test_closes_zero_balance_account(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Authenticated admin can close an account with zero balance."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="close@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-9001-0001",
+            balance_cents=0,
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(f"/admin/api/accounts/{account.id}/close", cookies=cookies)
+        assert resp.status_code == 200
+        assert "closed" in resp.json()["message"].lower()
+
+    async def test_non_zero_balance_returns_400(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Cannot close an account with a non-zero balance."""
+        await _create_admin(db_session)
+        account_id = await _seed_account(db_session)  # has 525000 balance
+        cookies = await _login(client)
+
+        resp = await client.post(f"/admin/api/accounts/{account_id}/close", cookies=cookies)
+        assert resp.status_code == 400
+        assert "non-zero" in resp.json()["detail"].lower()
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent account returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.post("/admin/api/accounts/99999/close", cookies=cookies)
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# POST /admin/api/cards/{id}/reset-pin
+# ===========================================================================
+
+
+class TestResetPinEndpoint:
+    async def test_resets_pin(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Authenticated admin can reset a card's PIN."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="pin@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-6001-0001",
+        )
+        card = await create_test_card(
+            db_session, account_id=account.id, card_number="1000-6001-0001"
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(
+            f"/admin/api/cards/{card.id}/reset-pin",
+            json={"new_pin": "4829"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 200
+        assert "reset" in resp.json()["message"].lower()
+
+    async def test_weak_pin_returns_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """A weak PIN returns 422."""
+        await _create_admin(db_session)
+        customer = await create_test_customer(db_session, email="weakpin@example.com")
+        account = await create_test_account(
+            db_session,
+            customer_id=customer.id,
+            account_number="1000-6002-0001",
+        )
+        card = await create_test_card(
+            db_session, account_id=account.id, card_number="1000-6002-0001"
+        )
+        await db_session.commit()
+        cookies = await _login(client)
+
+        resp = await client.post(
+            f"/admin/api/cards/{card.id}/reset-pin",
+            json={"new_pin": "1111"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 422
+
+    async def test_not_found_returns_404(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Nonexistent card returns 404."""
+        await _create_admin(db_session)
+        cookies = await _login(client)
+        resp = await client.post(
+            "/admin/api/cards/99999/reset-pin",
+            json={"new_pin": "4829"},
+            cookies=cookies,
+        )
+        assert resp.status_code == 404
+
+    async def test_without_auth_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """Unauthenticated request returns 401."""
+        resp = await client.post(
+            "/admin/api/cards/1/reset-pin",
+            json={"new_pin": "4829"},
+        )
         assert resp.status_code == 401

@@ -7,17 +7,34 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.api import get_db
+from src.atm.schemas.admin import (
+    AccountCreateRequest,
+    AccountUpdateRequest,
+    CustomerCreateRequest,
+    CustomerUpdateRequest,
+    PinResetRequest,
+)
 from src.atm.services.admin_service import (
     AdminAuthError,
+    activate_customer,
     admin_logout,
+    admin_reset_pin,
     authenticate_admin,
+    close_account,
+    create_account,
+    create_customer,
+    deactivate_customer,
     disable_maintenance_mode,
     enable_maintenance_mode,
     freeze_account,
     get_all_accounts,
+    get_all_customers,
     get_audit_logs,
+    get_customer_detail,
     get_maintenance_status,
     unfreeze_account,
+    update_account,
+    update_customer,
     validate_admin_session,
 )
 
@@ -233,3 +250,249 @@ async def maintenance_disable(admin: AdminSession) -> dict[str, str]:
         Confirmation message dict.
     """
     return await disable_maintenance_mode()
+
+
+# ---------------------------------------------------------------------------
+# Customer CRUD endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/customers")
+async def list_customers(db: DbSession, admin: AdminSession) -> list[dict[str, Any]]:
+    """List all customers with account counts.
+
+    Args:
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        List of customer dicts.
+    """
+    return await get_all_customers(db)
+
+
+@router.get("/api/customers/{customer_id}")
+async def get_customer(
+    customer_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, Any]:
+    """Get customer detail with accounts and cards.
+
+    Args:
+        customer_id: ID of the customer.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Customer detail dict.
+    """
+    result = await get_customer_detail(db, customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
+
+@router.post("/api/customers")
+async def create_customer_endpoint(
+    body: CustomerCreateRequest,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, Any]:
+    """Create a new customer.
+
+    Args:
+        body: Customer creation data.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Created customer dict.
+    """
+    try:
+        return await create_customer(db, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.put("/api/customers/{customer_id}")
+async def update_customer_endpoint(
+    customer_id: int,
+    body: CustomerUpdateRequest,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, Any]:
+    """Update an existing customer.
+
+    Args:
+        customer_id: ID of the customer to update.
+        body: Fields to update.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Updated customer dict.
+    """
+    data = body.model_dump(exclude_unset=True)
+    try:
+        result = await update_customer(db, customer_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
+
+@router.post("/api/customers/{customer_id}/deactivate")
+async def deactivate_customer_endpoint(
+    customer_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
+    """Deactivate (soft-delete) a customer.
+
+    Args:
+        customer_id: ID of the customer to deactivate.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Confirmation message dict.
+    """
+    result = await deactivate_customer(db, customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
+
+@router.post("/api/customers/{customer_id}/activate")
+async def activate_customer_endpoint(
+    customer_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
+    """Reactivate a customer.
+
+    Args:
+        customer_id: ID of the customer to activate.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Confirmation message dict.
+    """
+    result = await activate_customer(db, customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Account CRUD endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/customers/{customer_id}/accounts")
+async def create_account_endpoint(
+    customer_id: int,
+    body: AccountCreateRequest,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, Any]:
+    """Create a new account for a customer.
+
+    Args:
+        customer_id: ID of the customer.
+        body: Account creation data.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Created account dict.
+    """
+    try:
+        return await create_account(db, customer_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.put("/api/accounts/{account_id}")
+async def update_account_endpoint(
+    account_id: int,
+    body: AccountUpdateRequest,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, Any]:
+    """Update account limits.
+
+    Args:
+        account_id: ID of the account to update.
+        body: Fields to update.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Updated account dict.
+    """
+    data = body.model_dump(exclude_unset=True)
+    result = await update_account(db, account_id, data)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return result
+
+
+@router.post("/api/accounts/{account_id}/close")
+async def close_account_endpoint(
+    account_id: int,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
+    """Close an account (balance must be zero).
+
+    Args:
+        account_id: ID of the account to close.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Confirmation message dict.
+    """
+    try:
+        result = await close_account(db, account_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# PIN management endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/cards/{card_id}/reset-pin")
+async def reset_pin_endpoint(
+    card_id: int,
+    body: PinResetRequest,
+    db: DbSession,
+    admin: AdminSession,
+) -> dict[str, str]:
+    """Admin PIN reset for an ATM card.
+
+    Args:
+        card_id: ID of the ATM card.
+        body: New PIN data.
+        db: Database session.
+        admin: Validated admin session data.
+
+    Returns:
+        Confirmation message dict.
+    """
+    try:
+        result = await admin_reset_pin(db, card_id, body.new_pin)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return result
