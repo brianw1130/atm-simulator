@@ -62,6 +62,9 @@ def generate_statement_pdf(
     """
     # Resolve and validate path to prevent directory traversal
     real_path = os.path.realpath(file_path)
+    output_dir = os.path.realpath(os.path.dirname(file_path))
+    if not real_path.startswith(output_dir + os.sep):
+        raise ValueError("Statement file path escapes output directory")
     os.makedirs(os.path.dirname(real_path), exist_ok=True)
 
     doc = SimpleDocTemplate(
