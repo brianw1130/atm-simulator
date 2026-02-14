@@ -1,5 +1,15 @@
 import adminClient from "./client";
-import type { AdminAccount, AuditLogEntry, MaintenanceStatus } from "./types";
+import type {
+  AccountCreateData,
+  AdminAccount,
+  AdminAccountDetail,
+  AdminCustomer,
+  AdminCustomerDetail,
+  AuditLogEntry,
+  CustomerCreateData,
+  CustomerUpdateData,
+  MaintenanceStatus,
+} from "./types";
 
 // --- Auth ---
 
@@ -82,6 +92,100 @@ export async function enableMaintenance(
 export async function disableMaintenance(): Promise<{ message: string }> {
   const response = await adminClient.post<{ message: string }>(
     "/maintenance/disable",
+  );
+  return response.data;
+}
+
+// --- Customers ---
+
+export async function getCustomers(): Promise<AdminCustomer[]> {
+  const response = await adminClient.get<AdminCustomer[]>("/customers");
+  return response.data;
+}
+
+export async function getCustomerDetail(
+  customerId: number,
+): Promise<AdminCustomerDetail> {
+  const response = await adminClient.get<AdminCustomerDetail>(
+    `/customers/${String(customerId)}`,
+  );
+  return response.data;
+}
+
+export async function createCustomer(
+  data: CustomerCreateData,
+): Promise<AdminCustomer> {
+  const response = await adminClient.post<AdminCustomer>("/customers", data);
+  return response.data;
+}
+
+export async function updateCustomer(
+  customerId: number,
+  data: CustomerUpdateData,
+): Promise<AdminCustomer> {
+  const response = await adminClient.put<AdminCustomer>(
+    `/customers/${String(customerId)}`,
+    data,
+  );
+  return response.data;
+}
+
+export async function deactivateCustomer(
+  customerId: number,
+): Promise<{ message: string }> {
+  const response = await adminClient.post<{ message: string }>(
+    `/customers/${String(customerId)}/deactivate`,
+  );
+  return response.data;
+}
+
+export async function activateCustomer(
+  customerId: number,
+): Promise<{ message: string }> {
+  const response = await adminClient.post<{ message: string }>(
+    `/customers/${String(customerId)}/activate`,
+  );
+  return response.data;
+}
+
+export async function createAccount(
+  customerId: number,
+  data: AccountCreateData,
+): Promise<AdminAccountDetail> {
+  const response = await adminClient.post<AdminAccountDetail>(
+    `/customers/${String(customerId)}/accounts`,
+    data,
+  );
+  return response.data;
+}
+
+export async function updateAccount(
+  accountId: number,
+  data: Record<string, number>,
+): Promise<AdminAccountDetail> {
+  const response = await adminClient.put<AdminAccountDetail>(
+    `/accounts/${String(accountId)}`,
+    data,
+  );
+  return response.data;
+}
+
+export async function closeAccount(
+  accountId: number,
+): Promise<{ message: string }> {
+  const response = await adminClient.post<{ message: string }>(
+    `/accounts/${String(accountId)}/close`,
+  );
+  return response.data;
+}
+
+export async function resetPin(
+  cardId: number,
+  newPin: string,
+): Promise<{ message: string }> {
+  const response = await adminClient.post<{ message: string }>(
+    `/cards/${String(cardId)}/reset-pin`,
+    { new_pin: newPin },
   );
   return response.data;
 }

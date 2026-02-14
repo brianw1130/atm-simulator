@@ -5,6 +5,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "\u2302" },
+  { id: "customers", label: "Customers", icon: "\u263A" },
   { id: "accounts", label: "Accounts", icon: "\u2630" },
   { id: "audit-logs", label: "Audit Logs", icon: "\u2637" },
   { id: "maintenance", label: "Maintenance", icon: "\u2699" },

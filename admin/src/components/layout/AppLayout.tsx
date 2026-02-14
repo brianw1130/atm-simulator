@@ -4,6 +4,8 @@ import { TopBar } from "./TopBar";
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: "Dashboard",
+  customers: "Customers",
+  "customer-detail": "Customer Detail",
   accounts: "Accounts",
   "audit-logs": "Audit Logs",
   maintenance: "Maintenance",

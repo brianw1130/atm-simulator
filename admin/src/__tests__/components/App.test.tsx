@@ -8,6 +8,8 @@ vi.mock("../../api/endpoints", () => ({
   getAccounts: vi.fn(),
   getAuditLogs: vi.fn(),
   getMaintenanceStatus: vi.fn(),
+  getCustomers: vi.fn(),
+  getCustomerDetail: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
 }));
@@ -116,6 +118,81 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    });
+  });
+
+  it("navigates to Customers page", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getAuditLogs).mockResolvedValue([]);
+    vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
+      enabled: false,
+      reason: null,
+    });
+    vi.mocked(api.getCustomers).mockResolvedValue([]);
+    sessionStorage.setItem("admin_username", "admin");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Accounts")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Customers/ }));
+    await waitFor(() => {
+      expect(screen.getByText("Create Customer")).toBeInTheDocument();
+    });
+  });
+
+  it("navigates to customer detail and back", async () => {
+    const user = userEvent.setup();
+    const mockCustomers = [
+      {
+        id: 1,
+        first_name: "Alice",
+        last_name: "Johnson",
+        email: "alice@example.com",
+        phone: null,
+        date_of_birth: "1990-05-15",
+        is_active: true,
+        account_count: 1,
+      },
+    ];
+    vi.mocked(api.getAccounts).mockResolvedValue([]);
+    vi.mocked(api.getAuditLogs).mockResolvedValue([]);
+    vi.mocked(api.getMaintenanceStatus).mockResolvedValue({
+      enabled: false,
+      reason: null,
+    });
+    vi.mocked(api.getCustomers).mockResolvedValue(mockCustomers);
+    vi.mocked(api.getCustomerDetail).mockResolvedValue({
+      id: 1,
+      first_name: "Alice",
+      last_name: "Johnson",
+      email: "alice@example.com",
+      phone: null,
+      date_of_birth: "1990-05-15",
+      is_active: true,
+      account_count: 1,
+      accounts: [],
+    });
+    sessionStorage.setItem("admin_username", "admin");
+    render(<App />);
+
+    // Navigate to customers
+    await waitFor(() => {
+      expect(screen.getByText("Total Accounts")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: /Customers/ }));
+
+    // Click customer name to go to detail
+    await waitFor(() => {
+      expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Alice Johnson"));
+
+    // Verify detail page
+    await waitFor(() => {
+      expect(screen.getByText("Email: alice@example.com")).toBeInTheDocument();
     });
   });
 });

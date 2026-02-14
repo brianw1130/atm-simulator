@@ -10,17 +10,29 @@ import {
   getMaintenanceStatus,
   enableMaintenance,
   disableMaintenance,
+  getCustomers,
+  getCustomerDetail,
+  createCustomer,
+  updateCustomer,
+  deactivateCustomer,
+  activateCustomer,
+  createAccount,
+  updateAccount,
+  closeAccount,
+  resetPin,
 } from "../../api/endpoints";
 
 vi.mock("../../api/client", () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
 const mockGet = vi.mocked(adminClient.get);
 const mockPost = vi.mocked(adminClient.post);
+const mockPut = vi.mocked(adminClient.put);
 
 describe("API endpoints", () => {
   beforeEach(() => {
@@ -112,5 +124,87 @@ describe("API endpoints", () => {
     const result = await disableMaintenance();
     expect(mockPost).toHaveBeenCalledWith("/maintenance/disable");
     expect(result).toEqual({ message: "Maintenance disabled" });
+  });
+
+  // --- Customer endpoints ---
+
+  it("getCustomers calls GET /customers", async () => {
+    const customers = [{ id: 1, first_name: "Alice" }];
+    mockGet.mockResolvedValue({ data: customers });
+    const result = await getCustomers();
+    expect(mockGet).toHaveBeenCalledWith("/customers");
+    expect(result).toEqual(customers);
+  });
+
+  it("getCustomerDetail calls GET /customers/:id", async () => {
+    const detail = { id: 1, first_name: "Alice", accounts: [] };
+    mockGet.mockResolvedValue({ data: detail });
+    const result = await getCustomerDetail(1);
+    expect(mockGet).toHaveBeenCalledWith("/customers/1");
+    expect(result).toEqual(detail);
+  });
+
+  it("createCustomer calls POST /customers", async () => {
+    const data = { first_name: "Bob", last_name: "Smith", email: "bob@test.com", date_of_birth: "1990-01-01" };
+    const created = { id: 3, ...data };
+    mockPost.mockResolvedValue({ data: created });
+    const result = await createCustomer(data);
+    expect(mockPost).toHaveBeenCalledWith("/customers", data);
+    expect(result).toEqual(created);
+  });
+
+  it("updateCustomer calls PUT /customers/:id", async () => {
+    const data = { first_name: "Robert" };
+    const updated = { id: 3, first_name: "Robert" };
+    mockPut.mockResolvedValue({ data: updated });
+    const result = await updateCustomer(3, data);
+    expect(mockPut).toHaveBeenCalledWith("/customers/3", data);
+    expect(result).toEqual(updated);
+  });
+
+  it("deactivateCustomer calls POST /customers/:id/deactivate", async () => {
+    mockPost.mockResolvedValue({ data: { message: "Deactivated" } });
+    const result = await deactivateCustomer(1);
+    expect(mockPost).toHaveBeenCalledWith("/customers/1/deactivate");
+    expect(result).toEqual({ message: "Deactivated" });
+  });
+
+  it("activateCustomer calls POST /customers/:id/activate", async () => {
+    mockPost.mockResolvedValue({ data: { message: "Activated" } });
+    const result = await activateCustomer(2);
+    expect(mockPost).toHaveBeenCalledWith("/customers/2/activate");
+    expect(result).toEqual({ message: "Activated" });
+  });
+
+  it("createAccount calls POST /customers/:id/accounts", async () => {
+    const data = { account_type: "CHECKING" as const, initial_balance_cents: 0 };
+    const created = { id: 10, account_number: "1000-0001-0001" };
+    mockPost.mockResolvedValue({ data: created });
+    const result = await createAccount(1, data);
+    expect(mockPost).toHaveBeenCalledWith("/customers/1/accounts", data);
+    expect(result).toEqual(created);
+  });
+
+  it("updateAccount calls PUT /accounts/:id", async () => {
+    const data = { daily_withdrawal_limit_cents: 100000 };
+    const updated = { id: 10, daily_withdrawal_limit_cents: 100000 };
+    mockPut.mockResolvedValue({ data: updated });
+    const result = await updateAccount(10, data);
+    expect(mockPut).toHaveBeenCalledWith("/accounts/10", data);
+    expect(result).toEqual(updated);
+  });
+
+  it("closeAccount calls POST /accounts/:id/close", async () => {
+    mockPost.mockResolvedValue({ data: { message: "Account closed" } });
+    const result = await closeAccount(10);
+    expect(mockPost).toHaveBeenCalledWith("/accounts/10/close");
+    expect(result).toEqual({ message: "Account closed" });
+  });
+
+  it("resetPin calls POST /cards/:id/reset-pin", async () => {
+    mockPost.mockResolvedValue({ data: { message: "PIN reset" } });
+    const result = await resetPin(100, "4567");
+    expect(mockPost).toHaveBeenCalledWith("/cards/100/reset-pin", { new_pin: "4567" });
+    expect(result).toEqual({ message: "PIN reset" });
   });
 });

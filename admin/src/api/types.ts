@@ -23,6 +23,60 @@ export interface MaintenanceStatus {
   reason: string | null;
 }
 
+export interface AdminCard {
+  id: number;
+  card_number: string;
+  is_active: boolean;
+  failed_attempts: number;
+  is_locked: boolean;
+}
+
+export interface AdminAccountDetail {
+  id: number;
+  account_number: string;
+  account_type: "CHECKING" | "SAVINGS";
+  balance: string;
+  available_balance: string;
+  status: "ACTIVE" | "FROZEN" | "CLOSED";
+  cards: AdminCard[];
+}
+
+export interface AdminCustomer {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  date_of_birth: string;
+  is_active: boolean;
+  account_count: number;
+}
+
+export interface AdminCustomerDetail extends AdminCustomer {
+  accounts: AdminAccountDetail[];
+}
+
+export interface CustomerCreateData {
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  email: string;
+  phone?: string;
+}
+
+export interface CustomerUpdateData {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface AccountCreateData {
+  account_type: "CHECKING" | "SAVINGS";
+  initial_balance_cents: number;
+}
+
 export const AUDIT_EVENT_TYPES = [
   "AUTH_SUCCESS",
   "AUTH_FAILURE",
@@ -42,4 +96,14 @@ export const AUDIT_EVENT_TYPES = [
   "ACCOUNT_UNFROZEN",
   "MAINTENANCE_ENABLED",
   "MAINTENANCE_DISABLED",
+  "CUSTOMER_CREATED",
+  "CUSTOMER_UPDATED",
+  "CUSTOMER_DEACTIVATED",
+  "CUSTOMER_ACTIVATED",
+  "ACCOUNT_CREATED",
+  "ACCOUNT_UPDATED",
+  "ACCOUNT_CLOSED",
+  "PIN_RESET_ADMIN",
+  "DATA_EXPORTED",
+  "DATA_IMPORTED",
 ] as const;
