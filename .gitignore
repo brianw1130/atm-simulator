@@ -38,6 +38,12 @@ test-statements/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+
+# Admin
+admin/node_modules/
+admin/dist/
+admin/coverage/
+
 node_modules/
 
 # Sample screenshots (not version controlled)
