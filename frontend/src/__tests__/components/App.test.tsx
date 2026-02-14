@@ -412,6 +412,7 @@ describe("App", () => {
         amount: "$200.00",
         balance_after: "$5050.00",
         message: "OK",
+        source_account: "1000-0001-0001",
         destination_account: "1000-0002-0001",
       },
     };
