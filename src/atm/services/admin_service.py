@@ -922,7 +922,7 @@ async def export_snapshot(session: AsyncSession) -> dict[str, Any]:
     admin_data = [
         {
             "username": au.username,
-            "password": "CHANGE_ME",
+            "password": "CHANGE_ME",  # nosec B105 — placeholder for export, not a real credential
             "password_hash": au.password_hash,
             "role": au.role,
             "is_active": au.is_active,
