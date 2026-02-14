@@ -11,6 +11,8 @@ import {
   deposit,
   transfer,
   generateStatement,
+  getStatementDownloadUrl,
+  downloadStatement,
 } from "../../api/endpoints";
 
 vi.mock("../../api/client", () => ({
@@ -129,6 +131,56 @@ describe("API endpoints", () => {
       const result = await generateStatement({ days: 7 });
       expect(mockPost).toHaveBeenCalledWith("/statements/generate", { days: 7 });
       expect(result).toEqual(data);
+    });
+  });
+
+  describe("getStatementDownloadUrl", () => {
+    it("extracts filename from path and returns download URL", () => {
+      const url = getStatementDownloadUrl("/app/statements/stmt_123.pdf");
+      expect(url).toBe("/api/v1/statements/download/stmt_123.pdf");
+    });
+
+    it("returns empty filename for path with no file", () => {
+      const url = getStatementDownloadUrl("");
+      expect(url).toBe("/api/v1/statements/download/");
+    });
+  });
+
+  describe("downloadStatement", () => {
+    it("downloads blob and triggers browser download", async () => {
+      const blob = new Blob(["pdf content"], { type: "application/pdf" });
+      mockGet.mockResolvedValue({ data: blob });
+
+      const mockUrl = "blob:http://localhost/fake-url";
+      const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue(mockUrl);
+      const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+      const mockAnchor = {
+        href: "",
+        download: "",
+        click: vi.fn(),
+      };
+      const createElementSpy = vi.spyOn(document, "createElement").mockReturnValue(mockAnchor as unknown as HTMLAnchorElement);
+      const appendChildSpy = vi.spyOn(document.body, "appendChild").mockImplementation((n) => n);
+      const removeChildSpy = vi.spyOn(document.body, "removeChild").mockImplementation((n) => n);
+
+      await downloadStatement("/app/statements/stmt_abc.pdf");
+
+      expect(mockGet).toHaveBeenCalledWith("/statements/download/stmt_abc.pdf", { responseType: "blob" });
+      expect(createObjectURLSpy).toHaveBeenCalledWith(blob);
+      expect(createElementSpy).toHaveBeenCalledWith("a");
+      expect(mockAnchor.href).toBe(mockUrl);
+      expect(mockAnchor.download).toBe("stmt_abc.pdf");
+      expect(appendChildSpy).toHaveBeenCalled();
+      expect(mockAnchor.click).toHaveBeenCalled();
+      expect(removeChildSpy).toHaveBeenCalled();
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith(mockUrl);
+
+      createObjectURLSpy.mockRestore();
+      revokeObjectURLSpy.mockRestore();
+      createElementSpy.mockRestore();
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
     });
   });
 });

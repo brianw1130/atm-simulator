@@ -226,4 +226,356 @@ describe("App", () => {
     );
     expect(screen.getByTestId("maintenance-screen")).toBeInTheDocument();
   });
+
+  // ── Side button coverage for non-main-menu screens ──────────────────
+
+  const multiAccountState: ATMState = {
+    ...INITIAL_ATM_STATE,
+    sessionId: "sess-123",
+    customerName: "Alice",
+    accounts: [
+      { id: 1, account_number: "1000-0001-0001", account_type: "CHECKING", balance: "5250.00", available_balance: "5250.00", status: "ACTIVE" },
+      { id: 2, account_number: "1000-0001-0002", account_type: "SAVINGS", balance: "12500.00", available_balance: "12500.00", status: "ACTIVE" },
+    ],
+    selectedAccountId: 1,
+    currentScreen: "main_menu",
+  };
+
+  it("shows account buttons and back on balance inquiry screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "balance_inquiry" }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-left-checking")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left-savings")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows quick amounts and back on withdrawal screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "withdrawal" }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-left--20")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left--40")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left--60")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left--100")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right--200")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows confirm and cancel on withdrawal confirm screen", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "withdrawal_confirm",
+      pendingTransaction: { type: "withdrawal", amountCents: 10000 },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-confirm")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-cancel")).toBeInTheDocument();
+  });
+
+  it("shows another and done on receipt screens", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "withdrawal_receipt",
+      lastReceipt: {
+        receiptType: "withdrawal",
+        reference_number: "REF-1",
+        transaction_type: "WITHDRAWAL",
+        amount: "$100.00",
+        balance_after: "$5150.00",
+        message: "OK",
+        denominations: { twenties: 5, total_bills: 5, total_amount: "$100.00" },
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-another")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-done")).toBeInTheDocument();
+  });
+
+  it("shows deposit type selection buttons", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "deposit", pendingTransaction: null }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-left-cash")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left-check")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows back button on deposit amount entry phase", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "deposit",
+      pendingTransaction: { type: "deposit", amountCents: 0, depositType: "cash" },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows own account destinations on transfer screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "transfer" }}>
+        <App />
+      </TestProvider>,
+    );
+    // Current account is checking (id:1), so savings should appear as destination
+    expect(screen.getByTestId("side-btn-left-savings")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows confirm and cancel on transfer confirm screen", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "transfer_confirm",
+      pendingTransaction: { type: "transfer", amountCents: 50000, destinationAccount: "1000-0002-0001" },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-confirm")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-cancel")).toBeInTheDocument();
+  });
+
+  it("shows period buttons on statement screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "statement" }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-left-7-days")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left-30-days")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-left-90-days")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-back")).toBeInTheDocument();
+  });
+
+  it("shows cancel on pin change screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "pin_change" }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-cancel")).toBeInTheDocument();
+  });
+
+  it("renders deposit receipt screen with another/done buttons", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "deposit_receipt",
+      lastReceipt: {
+        receiptType: "deposit",
+        reference_number: "REF-2",
+        transaction_type: "DEPOSIT_CASH",
+        amount: "$500.00",
+        balance_after: "$5750.00",
+        message: "OK",
+        available_immediately: "$200.00",
+        held_amount: "$300.00",
+        hold_until: null,
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-another")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-done")).toBeInTheDocument();
+  });
+
+  it("renders transfer receipt screen with another/done buttons", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "transfer_receipt",
+      lastReceipt: {
+        receiptType: "transfer",
+        reference_number: "REF-3",
+        transaction_type: "TRANSFER_OUT",
+        amount: "$200.00",
+        balance_after: "$5050.00",
+        message: "OK",
+        destination_account: "1000-0002-0001",
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("side-btn-right-another")).toBeInTheDocument();
+    expect(screen.getByTestId("side-btn-right-done")).toBeInTheDocument();
+  });
+
+  // ── Keypad handler wiring ───────────────────────────────────────────
+
+  it("wires keypad digit to welcome screen handler", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    // Press '1' on keypad, card input should update
+    await user.click(screen.getByTestId("key-1"));
+    const input = screen.getByTestId("card-input");
+    expect((input as HTMLInputElement).value).toBe("1");
+  });
+
+  it("wires keypad clear to welcome screen handler", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId("key-1"));
+    await user.click(screen.getByTestId("key-2"));
+    await user.click(screen.getByTestId("key-clear"));
+    const input = screen.getByTestId("card-input");
+    expect((input as HTMLInputElement).value).toBe("1");
+  });
+
+  it("wires keypad cancel to welcome screen handler", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId("key-1"));
+    await user.click(screen.getByTestId("key-cancel"));
+    const input = screen.getByTestId("card-input");
+    expect((input as HTMLInputElement).value).toBe("");
+  });
+
+  it("wires keypad enter to welcome screen handler", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    // Press enter with no input should show error
+    await user.click(screen.getByTestId("key-enter"));
+    expect(screen.getByTestId("welcome-error")).toBeInTheDocument();
+  });
+
+  // ── Animation flag coverage ─────────────────────────────────────────
+
+  it("renders withdrawal receipt with cash dispenser and receipt printer", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "withdrawal_receipt",
+      lastReceipt: {
+        receiptType: "withdrawal",
+        reference_number: "REF-1",
+        transaction_type: "WITHDRAWAL",
+        amount: "$100.00",
+        balance_after: "$5150.00",
+        message: "OK",
+        denominations: { twenties: 5, total_bills: 5, total_amount: "$100.00" },
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    // Cash dispenser and receipt printer components are rendered
+    expect(screen.getByTestId("cash-dispenser")).toBeInTheDocument();
+    expect(screen.getByTestId("receipt-printer")).toBeInTheDocument();
+    // Card slot shows as active (card inserted)
+    expect(screen.getByTestId("card-slot")).toBeInTheDocument();
+  });
+
+  it("renders deposit receipt with receipt printer", () => {
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "deposit_receipt",
+      lastReceipt: {
+        receiptType: "deposit",
+        reference_number: "REF-2",
+        transaction_type: "DEPOSIT_CASH",
+        amount: "$500.00",
+        balance_after: "$5750.00",
+        message: "OK",
+        available_immediately: "$200.00",
+        held_amount: "$300.00",
+        hold_until: null,
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("receipt-printer")).toBeInTheDocument();
+    expect(screen.getByTestId("cash-dispenser")).toBeInTheDocument();
+  });
+
+  it("disables keypad when not on an input screen", () => {
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "balance_inquiry" }}>
+        <App />
+      </TestProvider>,
+    );
+    expect(screen.getByTestId("key-0")).toBeDisabled();
+  });
+
+  // ── Side button click behavior ──────────────────────────────────────
+
+  it("navigates back from balance inquiry via side button", async () => {
+    const user = userEvent.setup();
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "balance_inquiry" }}>
+        <App />
+      </TestProvider>,
+    );
+    await user.click(screen.getByTestId("side-btn-right-back"));
+    await waitFor(() => {
+      expect(screen.getByTestId("main-menu-screen")).toBeInTheDocument();
+    });
+  });
+
+  it("clicking deposit type Cash dispatches STAGE_TRANSACTION", async () => {
+    const user = userEvent.setup();
+    render(
+      <TestProvider initialState={{ ...multiAccountState, currentScreen: "deposit", pendingTransaction: null }}>
+        <App />
+      </TestProvider>,
+    );
+    await user.click(screen.getByTestId("side-btn-left-cash"));
+    // After clicking Cash, deposit screen should show Cash Deposit form
+    await waitFor(() => {
+      expect(screen.getByText(/Cash Deposit/i)).toBeInTheDocument();
+    });
+  });
+
+  it("clicking Another on receipt returns to main menu", async () => {
+    const user = userEvent.setup();
+    const state: ATMState = {
+      ...multiAccountState,
+      currentScreen: "withdrawal_receipt",
+      lastReceipt: {
+        receiptType: "withdrawal",
+        reference_number: "REF-1",
+        transaction_type: "WITHDRAWAL",
+        amount: "$100.00",
+        balance_after: "$5150.00",
+        message: "OK",
+        denominations: { twenties: 5, total_bills: 5, total_amount: "$100.00" },
+      },
+    };
+    render(
+      <TestProvider initialState={state}>
+        <App />
+      </TestProvider>,
+    );
+    await user.click(screen.getByTestId("side-btn-right-another"));
+    await waitFor(() => {
+      expect(screen.getByTestId("main-menu-screen")).toBeInTheDocument();
+    });
+  });
 });

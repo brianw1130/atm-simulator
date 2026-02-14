@@ -107,9 +107,11 @@ class TestMaintenanceMiddleware:
         redis = await get_redis()
         await redis.set("atm:maintenance_mode", "1")
 
-        # Admin login page should still be accessible (returns HTML, not 503).
+        # Admin paths must NOT be blocked by maintenance middleware.
+        # The actual status depends on whether admin/dist/ is built (200 vs 404),
+        # but it must never be 503.
         response = await client.get("/admin/login")
-        assert response.status_code == 200
+        assert response.status_code != 503
 
     async def test_503_includes_retry_after_header(self, client):
         redis = await get_redis()

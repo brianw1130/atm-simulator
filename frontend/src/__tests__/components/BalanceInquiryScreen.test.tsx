@@ -150,4 +150,40 @@ describe("BalanceInquiryScreen", () => {
     );
     expect(mockGetBalance).not.toHaveBeenCalled();
   });
+
+  it("shows API error detail from Axios response", async () => {
+    const axiosError = Object.assign(new Error("Request failed"), {
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { detail: "Account is frozen" },
+        headers: {},
+        statusText: "Bad Request",
+        config: {} as never,
+      },
+      config: {} as never,
+      toJSON: () => ({}),
+    });
+    // Patch axios.isAxiosError to recognize our mock
+    const axios = await import("axios");
+    const origIsAxiosError = axios.default.isAxiosError;
+    axios.default.isAxiosError = (val: unknown): val is never =>
+      (val as Record<string, unknown>)?.isAxiosError === true;
+
+    mockGetBalance.mockRejectedValue(axiosError);
+
+    await act(async () => {
+      render(
+        <TestProvider initialState={balanceState}>
+          <BalanceInquiryScreen />
+        </TestProvider>,
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Account is frozen")).toBeInTheDocument();
+    });
+
+    axios.default.isAxiosError = origIsAxiosError;
+  });
 });

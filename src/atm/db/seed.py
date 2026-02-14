@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.config import settings
 from src.atm.models.account import Account, AccountStatus, AccountType
+from src.atm.models.admin import AdminUser
 from src.atm.models.card import ATMCard
 from src.atm.models.customer import Customer
 from src.atm.utils.security import hash_pin
@@ -150,3 +151,14 @@ async def seed_database(session: AsyncSession) -> None:
     session.add_all([charlie_checking_card, charlie_savings_card])
 
     await session.flush()
+
+    # -- Admin user --
+    existing_admin = await session.execute(select(AdminUser).limit(1))
+    if existing_admin.scalars().first() is None:
+        admin = AdminUser(
+            username="admin",
+            password_hash=hash_pin("admin123", pepper),
+            role="admin",
+        )
+        session.add(admin)
+        await session.flush()
