@@ -17,6 +17,10 @@ Built with **FastAPI**, **SQLAlchemy 2.0**, **PostgreSQL**, **React 18** (skeuom
 - **Session Timeout** — 2-minute idle timer with 30-second countdown warning
 - **Audit Logging** — Every authentication attempt and transaction is logged
 - **Admin Dashboard** — React admin panel with account management, freeze/unfreeze, maintenance mode toggle, and audit log viewer
+- **Admin CRUD** — Full customer and account lifecycle management (create, update, deactivate) with PIN reset
+- **Data Export/Import** — Database snapshot export as JSON with conflict resolution on import (skip or replace)
+- **S3 Snapshot Persistence** — Auto-upload snapshots to S3 for data recovery across infrastructure teardown cycles
+- **Dashboard Statistics** — Aggregate metrics endpoint with customer, account, and balance totals
 
 ## Quick Start
 

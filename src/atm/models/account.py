@@ -53,6 +53,8 @@ class Account(Base):
     available_balance_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     daily_withdrawal_used_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     daily_transfer_used_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    daily_withdrawal_limit_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_transfer_limit_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[AccountStatus] = mapped_column(
         Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False
     )

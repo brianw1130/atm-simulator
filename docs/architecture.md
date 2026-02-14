@@ -62,6 +62,28 @@ page-based navigation with independent CRUD views.
 The admin API endpoints live at `/admin/api/*` and are registered before the SPA catch-all
 route, ensuring API calls are never intercepted by the frontend's `index.html` fallback.
 
+**Admin CRUD operations:** The admin dashboard supports full customer and account lifecycle
+management. Administrators can create, update, activate, and deactivate customers; create
+and close accounts; adjust daily withdrawal and transfer limits; and reset card PINs. All
+mutations are recorded in the audit log.
+
+**Data export/import:** The `/admin/api/export` endpoint generates a complete database
+snapshot as JSON (customers, accounts, cards, transactions). The `/admin/api/import` endpoint
+accepts a snapshot file and supports two conflict resolution strategies: `skip` (preserve
+existing records) and `replace` (overwrite with imported data). This enables data migration
+between environments and backup/restore workflows.
+
+**S3 snapshot persistence:** When `S3_BUCKET_NAME` is configured, the export endpoint
+automatically uploads snapshots to S3 in addition to returning them in the response. The
+database seeder can load from an S3 snapshot (via `SEED_SNAPSHOT_S3_KEY`) or a local file
+(via `SEED_SNAPSHOT_PATH`) instead of using hardcoded defaults, enabling data recovery
+across `terraform destroy` and re-provision cycles.
+
+**Dashboard statistics:** The `/admin/api/dashboard-stats` endpoint returns aggregate
+metrics computed via database queries: total customer count, total account count, sum of
+all account balances, recent transaction count, and current maintenance mode status. The
+admin dashboard polls this endpoint every 30 seconds to keep statistics current.
+
 ---
 
 ## Technology Decisions

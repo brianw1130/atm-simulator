@@ -50,6 +50,7 @@ from src.atm.services.admin_service import (
     get_all_customers,
     get_audit_logs,
     get_customer_detail,
+    get_dashboard_stats,
     import_snapshot,
     unfreeze_account,
     update_account,
@@ -675,7 +676,7 @@ class TestCreateAccount:
 
 class TestUpdateAccount:
     async def test_updates_account(self, db_session: AsyncSession) -> None:
-        """Updates account and returns dict."""
+        """Updates account limits and persists the values."""
         customer = await create_test_customer(db_session, email="upd_acct@example.com")
         account = await create_test_account(
             db_session, customer_id=customer.id, account_number="1000-9001-0001"
@@ -687,6 +688,28 @@ class TestUpdateAccount:
         )
         assert result is not None
         assert result["id"] == account.id
+
+        await db_session.refresh(account)
+        assert account.daily_withdrawal_limit_cents == 100000
+
+    async def test_updates_both_limits(self, db_session: AsyncSession) -> None:
+        """Updates both withdrawal and transfer limits."""
+        customer = await create_test_customer(db_session, email="upd_both@example.com")
+        account = await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-9001-0002"
+        )
+        await db_session.commit()
+
+        result = await update_account(
+            db_session,
+            account.id,
+            {"daily_withdrawal_limit_cents": 75000, "daily_transfer_limit_cents": 200000},
+        )
+        assert result is not None
+
+        await db_session.refresh(account)
+        assert account.daily_withdrawal_limit_cents == 75000
+        assert account.daily_transfer_limit_cents == 200000
 
     async def test_not_found_returns_none(self, db_session: AsyncSession) -> None:
         """Nonexistent account ID returns None."""
@@ -1225,3 +1248,166 @@ class TestExportImportRoundTrip:
         # Re-import with skip (should skip all since data exists)
         stats = await import_snapshot(db_session, snapshot, conflict_strategy="skip")
         assert stats["customers_skipped"] == 1
+
+
+# ===========================================================================
+# get_dashboard_stats
+# ===========================================================================
+
+
+class TestGetDashboardStats:
+    async def test_empty_database(self, db_session: AsyncSession) -> None:
+        """Empty database returns all zeros."""
+        stats = await get_dashboard_stats(db_session)
+        assert stats["total_customers"] == 0
+        assert stats["active_customers"] == 0
+        assert stats["total_accounts"] == 0
+        assert stats["active_accounts"] == 0
+        assert stats["frozen_accounts"] == 0
+        assert stats["closed_accounts"] == 0
+        assert stats["total_balance_formatted"] == "$0.00"
+
+    async def test_correct_counts(self, db_session: AsyncSession) -> None:
+        """Returns correct aggregate counts with mixed statuses."""
+        c1 = await create_test_customer(db_session, email="dash1@example.com")
+        c2 = await create_test_customer(db_session, email="dash2@example.com", is_active=False)
+        await create_test_account(
+            db_session,
+            customer_id=c1.id,
+            account_number="1000-D001-0001",
+            balance_cents=500000,
+        )
+        a2 = await create_test_account(
+            db_session,
+            customer_id=c1.id,
+            account_number="1000-D001-0002",
+            balance_cents=250075,
+        )
+        a3 = await create_test_account(
+            db_session,
+            customer_id=c2.id,
+            account_number="1000-D002-0001",
+            balance_cents=100000,
+        )
+        a2.status = AccountStatus.FROZEN
+        a3.status = AccountStatus.CLOSED
+        await db_session.flush()
+        await db_session.commit()
+
+        stats = await get_dashboard_stats(db_session)
+        assert stats["total_customers"] == 2
+        assert stats["active_customers"] == 1
+        assert stats["total_accounts"] == 3
+        assert stats["active_accounts"] == 1
+        assert stats["frozen_accounts"] == 1
+        assert stats["closed_accounts"] == 1
+        # Only ACTIVE accounts count toward balance: $5,000.00
+        assert stats["total_balance_formatted"] == "$5,000.00"
+
+
+# ===========================================================================
+# get_all_accounts — customer_id filter
+# ===========================================================================
+
+
+class TestGetAllAccountsFilter:
+    async def test_filter_by_customer_id(self, db_session: AsyncSession) -> None:
+        """Passing customer_id returns only that customer's accounts."""
+        c1 = await create_test_customer(db_session, email="filt1@example.com")
+        c2 = await create_test_customer(db_session, email="filt2@example.com")
+        await create_test_account(db_session, customer_id=c1.id, account_number="1000-F001-0001")
+        await create_test_account(db_session, customer_id=c2.id, account_number="1000-F002-0001")
+        await db_session.commit()
+
+        result = await get_all_accounts(db_session, customer_id=c1.id)
+        assert len(result) == 1
+        assert result[0]["account_number"] == "1000-F001-0001"
+
+
+# ===========================================================================
+# get_audit_logs — account_id filter
+# ===========================================================================
+
+
+class TestGetAuditLogsAccountFilter:
+    async def test_filter_by_account_id(self, db_session: AsyncSession) -> None:
+        """Passing account_id returns only matching log entries."""
+        from src.atm.services.audit_service import log_event
+
+        c = await create_test_customer(db_session, email="audfilt@example.com")
+        a1 = await create_test_account(
+            db_session, customer_id=c.id, account_number="1000-AF01-0001"
+        )
+        a2 = await create_test_account(
+            db_session, customer_id=c.id, account_number="1000-AF01-0002"
+        )
+        await log_event(db_session, AuditEventType.WITHDRAWAL, account_id=a1.id, details={})
+        await log_event(db_session, AuditEventType.DEPOSIT, account_id=a2.id, details={})
+        await db_session.commit()
+
+        result = await get_audit_logs(db_session, limit=100, account_id=a1.id)
+        assert len(result) == 1
+        assert result[0]["account_id"] == a1.id
+
+
+# ===========================================================================
+# import_snapshot — card replacement
+# ===========================================================================
+
+
+class TestImportCardReplace:
+    async def test_replace_existing_card(self, db_session: AsyncSession) -> None:
+        """Replace strategy updates existing card's PIN and resets lockout."""
+        customer = await create_test_customer(db_session, email="cardrpl@example.com")
+        account = await create_test_account(
+            db_session, customer_id=customer.id, account_number="1000-CR01-0001"
+        )
+        card = await create_test_card(
+            db_session,
+            account_id=account.id,
+            card_number="1000-CR01-0001",
+            pin="5678",
+        )
+        card.failed_attempts = 3
+        await db_session.flush()
+        await db_session.commit()
+
+        snapshot = {
+            "version": "1.0",
+            "exported_at": "2026-02-14T00:00:00Z",
+            "customers": [
+                {
+                    "first_name": "Card",
+                    "last_name": "Replace",
+                    "date_of_birth": "1990-01-01",
+                    "email": "cardrpl@example.com",
+                    "is_active": True,
+                    "accounts": [
+                        {
+                            "account_number": "1000-CR01-0001",
+                            "account_type": "CHECKING",
+                            "balance_cents": 0,
+                            "available_balance_cents": 0,
+                            "status": "ACTIVE",
+                            "cards": [
+                                {
+                                    "card_number": "1000-CR01-0001",
+                                    "pin": "4826",
+                                    "pin_hash": "",
+                                    "is_active": True,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "admin_users": [],
+        }
+
+        await import_snapshot(db_session, snapshot, conflict_strategy="replace")
+        await db_session.commit()
+
+        await db_session.refresh(card)
+        assert card.failed_attempts == 0
+        assert card.locked_until is None
+        assert verify_pin("4826", card.pin_hash, settings.pin_pepper)

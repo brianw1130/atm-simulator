@@ -5,19 +5,28 @@ import App from "../../App";
 import * as api from "../../api/endpoints";
 
 vi.mock("../../api/endpoints", () => ({
-  getAccounts: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
   getDashboardStats: vi.fn(),
-  getAuditLogs: vi.fn(),
-  getMaintenanceStatus: vi.fn(),
-  getCustomers: vi.fn(),
-  getCustomerDetail: vi.fn(),
+  getAccounts: vi.fn(),
   freezeAccount: vi.fn(),
   unfreezeAccount: vi.fn(),
   closeAccount: vi.fn(),
+  getAuditLogs: vi.fn(),
+  getMaintenanceStatus: vi.fn(),
+  enableMaintenance: vi.fn(),
+  disableMaintenance: vi.fn(),
+  getCustomers: vi.fn(),
+  getCustomerDetail: vi.fn(),
+  createCustomer: vi.fn(),
+  updateCustomer: vi.fn(),
+  deactivateCustomer: vi.fn(),
+  activateCustomer: vi.fn(),
+  createAccount: vi.fn(),
+  updateAccount: vi.fn(),
+  resetPin: vi.fn(),
   exportSnapshot: vi.fn(),
   importSnapshot: vi.fn(),
-  login: vi.fn(),
-  logout: vi.fn(),
 }));
 
 describe("App", () => {

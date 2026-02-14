@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.atm.models.audit import AuditEventType, AuditLog
@@ -620,6 +621,14 @@ class TestUpdateAccountEndpoint:
         )
         assert resp.status_code == 200
         assert resp.json()["id"] == account_id
+
+        # Verify the value was actually persisted
+        from src.atm.models.account import Account
+
+        result = await db_session.execute(select(Account).where(Account.id == account_id))
+        account = result.scalars().first()
+        assert account is not None
+        assert account.daily_withdrawal_limit_cents == 100000
 
     async def test_not_found_returns_404(
         self, client: AsyncClient, db_session: AsyncSession

@@ -531,3 +531,324 @@ Generate a PDF account statement for a specified date range.
 |---|---|---|
 | `400` | `STMT_INVALID_DATE_RANGE` | `end_date` is before `start_date` or in the future. |
 | `422` | `VALIDATION_ERROR` | Only one of `start_date`/`end_date` provided, or `days` out of range. |
+
+---
+
+## Admin API
+
+The admin API provides endpoints for managing customers, accounts, and system settings.
+All admin endpoints are served under the `/admin/api/` prefix.
+
+**Authentication:** All endpoints except `POST /admin/api/login` require a valid
+`admin_session` HTTP-only cookie. Unauthenticated requests receive `401 Unauthorized`.
+
+---
+
+### Authentication
+
+#### `POST /admin/api/login`
+
+Authenticate as an administrator. Sets an `admin_session` HTTP-only cookie on success.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `username` | string | Yes | Admin username. |
+| `password` | string | Yes | Admin password. |
+
+**Response `200 OK`:** `{ "message": "Login successful" }`
+
+**Error:** `401` if credentials are invalid.
+
+---
+
+#### `POST /admin/api/logout`
+
+Invalidate the current admin session and clear the session cookie. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Logged out" }`
+
+---
+
+### Dashboard
+
+#### `GET /admin/api/dashboard-stats`
+
+Return aggregate statistics including total customers, total accounts, total balance across
+all accounts, recent transaction count, and maintenance mode status. Requires admin session cookie.
+
+**Response `200 OK`:** Object with aggregate counts and balances.
+
+---
+
+### Customers
+
+#### `GET /admin/api/customers`
+
+List all customers. Requires admin session cookie.
+
+**Response `200 OK`:** Array of customer objects with `id`, `first_name`, `last_name`,
+`email`, `date_of_birth`, `is_active`, and `created_at`.
+
+---
+
+#### `GET /admin/api/customers/{id}`
+
+Get a single customer with their associated accounts. Requires admin session cookie.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | integer | Customer ID. |
+
+**Response `200 OK`:** Customer object with nested `accounts` array.
+
+**Error:** `404` if customer not found.
+
+---
+
+#### `POST /admin/api/customers`
+
+Create a new customer. Requires admin session cookie.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `first_name` | string | Yes | Customer first name. |
+| `last_name` | string | Yes | Customer last name. |
+| `email` | string | Yes | Customer email address. |
+| `date_of_birth` | string (date) | Yes | Date of birth (ISO 8601). |
+
+**Response `201 Created`:** The created customer object.
+
+---
+
+#### `PUT /admin/api/customers/{id}`
+
+Update a customer's fields. Requires admin session cookie.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | integer | Customer ID. |
+
+**Request Body:** Any subset of `first_name`, `last_name`, `email`, `date_of_birth`.
+
+**Response `200 OK`:** The updated customer object.
+
+**Error:** `404` if customer not found.
+
+---
+
+#### `POST /admin/api/customers/{id}/deactivate`
+
+Deactivate a customer (soft delete). Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Customer deactivated" }`
+
+**Error:** `404` if customer not found.
+
+---
+
+#### `POST /admin/api/customers/{id}/activate`
+
+Reactivate a previously deactivated customer. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Customer activated" }`
+
+**Error:** `404` if customer not found.
+
+---
+
+### Accounts
+
+#### `GET /admin/api/accounts`
+
+List all accounts. Requires admin session cookie.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `customer_id` | integer | No | Filter accounts by customer ID. |
+
+**Response `200 OK`:** Array of account objects.
+
+---
+
+#### `POST /admin/api/customers/{id}/accounts`
+
+Create a new account for a customer. Requires admin session cookie.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | integer | Customer ID. |
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `account_type` | string | Yes | `"CHECKING"` or `"SAVINGS"`. |
+| `initial_balance_cents` | integer | Yes | Initial balance in cents. |
+
+**Response `201 Created`:** The created account object.
+
+---
+
+#### `PUT /admin/api/accounts/{id}`
+
+Update account limits. Requires admin session cookie.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | integer | Account ID. |
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `daily_withdrawal_limit_cents` | integer | No | New daily withdrawal limit in cents. |
+| `daily_transfer_limit_cents` | integer | No | New daily transfer limit in cents. |
+
+**Response `200 OK`:** The updated account object.
+
+---
+
+#### `POST /admin/api/accounts/{id}/freeze`
+
+Freeze an account, preventing all transactions. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Account frozen" }`
+
+**Error:** `404` if account not found.
+
+---
+
+#### `POST /admin/api/accounts/{id}/unfreeze`
+
+Unfreeze a previously frozen account. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Account unfrozen" }`
+
+**Error:** `404` if account not found.
+
+---
+
+#### `POST /admin/api/accounts/{id}/close`
+
+Close an account. The account balance must be zero before closing. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Account closed" }`
+
+**Error:** `400` if balance is not zero. `404` if account not found.
+
+---
+
+### Cards
+
+#### `POST /admin/api/cards/{id}/reset-pin`
+
+Reset a card's PIN. Requires admin session cookie.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | integer | Card ID. |
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `new_pin` | string | Yes | New 4-6 digit PIN. Must pass complexity rules. |
+
+**Response `200 OK`:** `{ "message": "PIN reset successfully" }`
+
+**Error:** `404` if card not found. `422` if new PIN fails complexity validation.
+
+---
+
+### Audit Logs
+
+#### `GET /admin/api/audit-logs`
+
+Retrieve audit log entries. Requires admin session cookie.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `limit` | integer | No | Maximum number of entries to return (default: 50). |
+| `event_type` | string | No | Filter by event type. |
+| `account_id` | integer | No | Filter by account ID. |
+
+**Response `200 OK`:** Array of audit log entries with `id`, `event_type`, `account_id`,
+`ip_address`, `session_id`, `details`, and `created_at`.
+
+---
+
+### Maintenance Mode
+
+#### `GET /admin/api/maintenance/status`
+
+Get the current maintenance mode status. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "enabled": false, "reason": null }`
+
+---
+
+#### `POST /admin/api/maintenance/enable`
+
+Enable ATM maintenance mode. All ATM API requests will receive `503 Service Unavailable`.
+Requires admin session cookie.
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `reason` | string | No | Optional reason for enabling maintenance. |
+
+**Response `200 OK`:** `{ "message": "Maintenance mode enabled" }`
+
+---
+
+#### `POST /admin/api/maintenance/disable`
+
+Disable maintenance mode and restore normal ATM operations. Requires admin session cookie.
+
+**Response `200 OK`:** `{ "message": "Maintenance mode disabled" }`
+
+---
+
+### Data Export / Import
+
+#### `GET /admin/api/export`
+
+Export a full database snapshot as a JSON file. Includes all customers, accounts, cards,
+and transactions. Requires admin session cookie.
+
+**Response `200 OK`:** JSON file download containing the complete database state.
+
+---
+
+#### `POST /admin/api/import?conflict_strategy=skip|replace`
+
+Import a database snapshot from a JSON file. Requires admin session cookie.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `conflict_strategy` | string | No | How to handle existing records: `skip` (default) keeps existing data, `replace` overwrites with imported data. |
+
+**Request:** Multipart form data with a `file` field containing the JSON snapshot.
+
+**Response `200 OK`:** Summary of imported records (created, skipped, or replaced counts).

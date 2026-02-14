@@ -164,6 +164,20 @@ All configuration is managed through environment variables. Copy `.env.example` 
 | `LOG_LEVEL` | `INFO` | Python log level: DEBUG, INFO, WARNING, ERROR, CRITICAL |
 | `ENVIRONMENT` | `development` | Application environment: `development`, `testing`, or `production`. Controls debug features, docs endpoints, and database echo. |
 | `FRONTEND_ENABLED` | `true` | Set to `false` to disable React web UI serving (API-only mode). |
+| `S3_BUCKET_NAME` | *(empty)* | S3 bucket name for snapshots. Leave empty to disable S3 features. |
+| `AWS_REGION` | `us-east-1` | AWS region for the S3 client. |
+| `SEED_SNAPSHOT_S3_KEY` | *(empty)* | S3 object key to seed the database from on startup. Leave empty to use hardcoded defaults. |
+| `SEED_SNAPSHOT_PATH` | *(empty)* | Local file path to seed the database from. Leave empty to use hardcoded defaults. |
+
+### S3 Snapshot Storage (Optional)
+
+The application can persist database snapshots to S3 for data recovery across `terraform destroy` cycles. Configure these environment variables:
+
+- `S3_BUCKET_NAME`: S3 bucket name. Leave empty to disable S3 features.
+- `AWS_REGION`: AWS region (default: `us-east-1`).
+- `SEED_SNAPSHOT_S3_KEY`: When set, the application seeds its database from this S3 object on startup instead of using hardcoded defaults.
+
+The ECS task role must have `s3:PutObject`, `s3:GetObject`, and `s3:ListBucket` permissions on the configured bucket. The Terraform modules pass the bucket name from the S3 module to ECS automatically.
 
 ## Database Setup
 

@@ -139,3 +139,24 @@ class TestSeedFromS3:
         )
         customer = result.scalars().first()
         assert customer is not None
+
+    async def test_seed_s3_exception_falls_back(self, db_session: AsyncSession) -> None:
+        """When S3 download raises an exception, seed falls back to defaults."""
+        with (
+            patch("src.atm.db.seed.settings") as mock_settings,
+            patch(
+                "src.atm.services.s3_client.download_snapshot",
+                side_effect=ConnectionError("S3 unreachable"),
+            ),
+        ):
+            mock_settings.seed_snapshot_s3_key = "snapshots/broken.json"
+            mock_settings.seed_snapshot_path = ""
+            mock_settings.pin_pepper = "test-pepper"
+            await seed_database(db_session)
+            await db_session.commit()
+
+        result = await db_session.execute(
+            select(Customer).where(Customer.email == "alice.johnson@example.com")
+        )
+        customer = result.scalars().first()
+        assert customer is not None

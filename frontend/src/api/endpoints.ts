@@ -13,6 +13,8 @@ import type {
   TransferResponse,
   StatementRequest,
   StatementResponse,
+  AsyncStatementResponse,
+  StatementStatusResponse,
   PinChangeRequest,
 } from "./types";
 
@@ -93,6 +95,25 @@ export async function generateStatement(
   const response = await apiClient.post<StatementResponse>(
     "/statements/generate",
     data,
+  );
+  return response.data;
+}
+
+export async function generateStatementAsync(
+  data: StatementRequest,
+): Promise<AsyncStatementResponse> {
+  const response = await apiClient.post<AsyncStatementResponse>(
+    "/statements/generate-async",
+    data,
+  );
+  return response.data;
+}
+
+export async function getStatementStatus(
+  taskId: string,
+): Promise<StatementStatusResponse> {
+  const response = await apiClient.get<StatementStatusResponse>(
+    `/statements/status/${taskId}`,
   );
   return response.data;
 }

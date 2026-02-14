@@ -121,8 +121,22 @@ export interface StatementResponse {
   closing_balance: string;
 }
 
+export interface AsyncStatementResponse {
+  task_id: string;
+  status: string;
+}
+
+export interface StatementStatusResponse {
+  task_id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  result?: StatementResponse;
+  error?: string;
+}
+
 // --- Errors ---
 
 export interface ErrorResponse {
   detail: string;
+  error?: string;
+  error_code?: string;
 }

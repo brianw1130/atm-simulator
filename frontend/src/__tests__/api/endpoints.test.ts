@@ -11,6 +11,8 @@ import {
   deposit,
   transfer,
   generateStatement,
+  generateStatementAsync,
+  getStatementStatus,
   getStatementDownloadUrl,
   downloadStatement,
 } from "../../api/endpoints";
@@ -130,6 +132,30 @@ describe("API endpoints", () => {
       mockPost.mockResolvedValue({ data });
       const result = await generateStatement({ days: 7 });
       expect(mockPost).toHaveBeenCalledWith("/statements/generate", { days: 7 });
+      expect(result).toEqual(data);
+    });
+  });
+
+  describe("generateStatementAsync", () => {
+    it("posts to /statements/generate-async and returns data", async () => {
+      const data = { task_id: "task-abc-123", status: "pending" };
+      mockPost.mockResolvedValue({ data });
+      const result = await generateStatementAsync({ days: 30 });
+      expect(mockPost).toHaveBeenCalledWith("/statements/generate-async", { days: 30 });
+      expect(result).toEqual(data);
+    });
+  });
+
+  describe("getStatementStatus", () => {
+    it("gets /statements/status/{taskId} and returns data", async () => {
+      const data = {
+        task_id: "task-abc-123",
+        status: "completed",
+        result: { file_path: "/tmp/stmt.pdf", period: "30 days", transaction_count: 12 },
+      };
+      mockGet.mockResolvedValue({ data });
+      const result = await getStatementStatus("task-abc-123");
+      expect(mockGet).toHaveBeenCalledWith("/statements/status/task-abc-123");
       expect(result).toEqual(data);
     });
   });

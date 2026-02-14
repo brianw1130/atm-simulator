@@ -744,8 +744,10 @@ async def update_account(
 
     updated_fields = []
     if data.get("daily_withdrawal_limit_cents") is not None:
+        account.daily_withdrawal_limit_cents = data["daily_withdrawal_limit_cents"]
         updated_fields.append("daily_withdrawal_limit_cents")
     if data.get("daily_transfer_limit_cents") is not None:
+        account.daily_transfer_limit_cents = data["daily_transfer_limit_cents"]
         updated_fields.append("daily_transfer_limit_cents")
     await session.flush()
 
