@@ -32,6 +32,8 @@ locals {
     { name = "S3_BUCKET_NAME", value = var.s3_statements_bucket_name },
     { name = "AWS_REGION", value = var.aws_region },
     { name = "SEED_SNAPSHOT_S3_KEY", value = var.seed_snapshot_s3_key },
+    { name = "SEED_SNAPSHOT_PATH", value = var.seed_snapshot_path },
+    { name = "FRONTEND_ENABLED", value = tostring(var.frontend_enabled) },
   ]
 
   common_secrets = [

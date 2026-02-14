@@ -188,6 +188,7 @@ async def get_all_accounts(
             "account_number": a.account_number,
             "account_type": a.account_type.value,
             "balance": f"${a.balance_cents / 100:,.2f}",
+            "available_balance": f"${a.available_balance_cents / 100:,.2f}",
             "status": a.status.value,
             "customer_name": a.customer.full_name if a.customer else "Unknown",
         }
@@ -270,6 +271,7 @@ async def get_audit_logs(
             "id": log.id,
             "event_type": log.event_type.value,
             "account_id": log.account_id,
+            "ip_address": log.ip_address,
             "session_id": log.session_id,
             "details": log.details,
             "created_at": log.created_at.isoformat() if log.created_at else None,
@@ -981,6 +983,8 @@ async def import_snapshot(
         "accounts_skipped": 0,
         "accounts_replaced": 0,
         "cards_created": 0,
+        "cards_skipped": 0,
+        "cards_replaced": 0,
         "admin_users_created": 0,
         "admin_users_skipped": 0,
     }
@@ -1078,7 +1082,9 @@ async def import_snapshot(
                         existing_card.failed_attempts = 0
                         existing_card.locked_until = None
                         await session.flush()
-                    # skip: leave card as-is
+                        stats["cards_replaced"] += 1
+                    else:
+                        stats["cards_skipped"] += 1
                 else:
                     card = ATMCard(
                         account_id=account.id,

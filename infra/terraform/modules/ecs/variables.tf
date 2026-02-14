@@ -158,6 +158,18 @@ variable "seed_snapshot_s3_key" {
   default     = ""
 }
 
+variable "seed_snapshot_path" {
+  description = "Local file path to seed database from on startup (empty = use defaults)"
+  type        = string
+  default     = ""
+}
+
+variable "frontend_enabled" {
+  description = "Enable serving the React web UI (set false for API-only mode)"
+  type        = bool
+  default     = true
+}
+
 # Deployment
 variable "deployment_minimum_healthy_percent" {
   description = "Minimum healthy percent during deployment (0 allows downtime, 100 for zero-downtime)"

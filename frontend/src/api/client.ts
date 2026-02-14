@@ -32,9 +32,14 @@ apiClient.interceptors.response.use(
         }
       }
       if (error.response.status === 503) {
+        const data: unknown = error.response.data;
         const reason =
-          (error.response.data as { detail?: string })?.detail ??
-          "ATM is under maintenance";
+          typeof data === "object" &&
+          data !== null &&
+          "detail" in data &&
+          typeof (data as Record<string, unknown>).detail === "string"
+            ? (data as Record<string, string>).detail
+            : "ATM is under maintenance";
         window.dispatchEvent(
           new CustomEvent("atm:maintenance", { detail: reason }),
         );

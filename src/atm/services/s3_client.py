@@ -36,20 +36,24 @@ def upload_snapshot(data: dict[str, Any], filename: str) -> bool:
         filename: The filename within the ``snapshots/`` prefix.
 
     Returns:
-        True on success, False if S3 is not available.
+        True on success, False if S3 is not available or upload fails.
     """
     client = _get_s3_client()
     if not client:
         return False
-    key = f"snapshots/{filename}"
-    client.put_object(
-        Bucket=settings.s3_bucket_name,
-        Key=key,
-        Body=json.dumps(data, indent=2),
-        ContentType="application/json",
-    )
-    logger.info("Uploaded snapshot to s3://%s/%s", settings.s3_bucket_name, key)
-    return True
+    try:
+        key = f"snapshots/{filename}"
+        client.put_object(
+            Bucket=settings.s3_bucket_name,
+            Key=key,
+            Body=json.dumps(data, indent=2),
+            ContentType="application/json",
+        )
+        logger.info("Uploaded snapshot to s3://%s/%s", settings.s3_bucket_name, key)
+        return True
+    except Exception:
+        logger.warning("Failed to upload snapshot to S3.", exc_info=True)
+        return False
 
 
 def download_snapshot(key: str) -> dict[str, Any] | None:
@@ -64,9 +68,13 @@ def download_snapshot(key: str) -> dict[str, Any] | None:
     client = _get_s3_client()
     if not client:
         return None
-    response = client.get_object(Bucket=settings.s3_bucket_name, Key=key)
-    result: dict[str, Any] = json.loads(response["Body"].read().decode("utf-8"))
-    return result
+    try:
+        response = client.get_object(Bucket=settings.s3_bucket_name, Key=key)
+        result: dict[str, Any] = json.loads(response["Body"].read().decode("utf-8"))
+        return result
+    except Exception:
+        logger.warning("Failed to download snapshot from S3.", exc_info=True)
+        return None
 
 
 def list_snapshots() -> list[str]:
@@ -74,13 +82,17 @@ def list_snapshots() -> list[str]:
 
     Returns:
         List of S3 object keys under the ``snapshots/`` prefix, or an empty list
-        if S3 is not available.
+        if S3 is not available or the listing fails.
     """
     client = _get_s3_client()
     if not client:
         return []
-    response = client.list_objects_v2(
-        Bucket=settings.s3_bucket_name,
-        Prefix="snapshots/",
-    )
-    return [obj["Key"] for obj in response.get("Contents", [])]
+    try:
+        response = client.list_objects_v2(
+            Bucket=settings.s3_bucket_name,
+            Prefix="snapshots/",
+        )
+        return [obj["Key"] for obj in response.get("Contents", [])]
+    except Exception:
+        logger.warning("Failed to list S3 snapshots.", exc_info=True)
+        return []

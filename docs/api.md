@@ -147,6 +147,30 @@ Invalidate the current session. Requires authentication.
 
 ---
 
+#### `POST /api/v1/auth/session/refresh`
+
+Refresh the current session's inactivity timer. Lightweight endpoint for keeping
+the session alive during extended user interaction.
+
+**Headers:** `X-Session-ID: <token>`
+
+**Response `200 OK`:**
+
+```json
+{
+  "message": "Session refreshed",
+  "timeout_seconds": "120"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Condition |
+|---|---|---|
+| `401` | `AUTH_SESSION_INVALID` | Session not found or already expired. |
+
+---
+
 #### `POST /api/v1/auth/pin/change`
 
 Change the PIN for the authenticated card. Requires verification of the current PIN.

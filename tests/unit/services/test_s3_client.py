@@ -35,6 +35,16 @@ class TestUploadSnapshot:
         result = upload_snapshot({"version": "1.0"}, "test.json")
         assert result is False
 
+    def test_upload_exception_returns_false(self) -> None:
+        """upload_snapshot returns False when put_object raises an exception."""
+        mock_client = MagicMock()
+        mock_client.put_object.side_effect = Exception("S3 unavailable")
+        with patch("src.atm.services.s3_client._get_s3_client", return_value=mock_client):
+            from src.atm.services.s3_client import upload_snapshot
+
+            result = upload_snapshot({"version": "1.0"}, "test.json")
+        assert result is False
+
 
 class TestDownloadSnapshot:
     @patch("src.atm.services.s3_client.settings")
@@ -65,6 +75,16 @@ class TestDownloadSnapshot:
         from src.atm.services.s3_client import download_snapshot
 
         result = download_snapshot("snapshots/test.json")
+        assert result is None
+
+    def test_download_exception_returns_none(self) -> None:
+        """download_snapshot returns None when get_object raises an exception."""
+        mock_client = MagicMock()
+        mock_client.get_object.side_effect = Exception("NoSuchKey")
+        with patch("src.atm.services.s3_client._get_s3_client", return_value=mock_client):
+            from src.atm.services.s3_client import download_snapshot
+
+            result = download_snapshot("snapshots/missing.json")
         assert result is None
 
 
@@ -112,6 +132,16 @@ class TestListSnapshots:
         from src.atm.services.s3_client import list_snapshots
 
         result = list_snapshots()
+        assert result == []
+
+    def test_list_exception_returns_empty(self) -> None:
+        """list_snapshots returns empty list when list_objects_v2 raises an exception."""
+        mock_client = MagicMock()
+        mock_client.list_objects_v2.side_effect = Exception("Access denied")
+        with patch("src.atm.services.s3_client._get_s3_client", return_value=mock_client):
+            from src.atm.services.s3_client import list_snapshots
+
+            result = list_snapshots()
         assert result == []
 
 
