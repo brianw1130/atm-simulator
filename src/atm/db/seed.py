@@ -31,6 +31,17 @@ async def seed_database(session: AsyncSession) -> None:
         session: An async SQLAlchemy session. The caller is responsible for
             committing or rolling back the transaction.
     """
+    # Seed admin user independently (safe to run on existing databases)
+    existing_admin = await session.execute(select(AdminUser).limit(1))
+    if existing_admin.scalars().first() is None:
+        admin = AdminUser(
+            username="admin",
+            password_hash=hash_pin("admin123", settings.pin_pepper),
+            role="admin",
+        )
+        session.add(admin)
+        await session.flush()
+
     existing = await session.execute(select(Customer).limit(1))
     if existing.scalars().first() is not None:
         return
@@ -151,14 +162,3 @@ async def seed_database(session: AsyncSession) -> None:
     session.add_all([charlie_checking_card, charlie_savings_card])
 
     await session.flush()
-
-    # -- Admin user --
-    existing_admin = await session.execute(select(AdminUser).limit(1))
-    if existing_admin.scalars().first() is None:
-        admin = AdminUser(
-            username="admin",
-            password_hash=hash_pin("admin123", pepper),
-            role="admin",
-        )
-        session.add(admin)
-        await session.flush()
